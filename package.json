@@ -4,7 +4,8 @@
   "description": "A system for mutual authentication of two parties over a communications channel",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "jest",
+    "test:watch": "jest --watch"
   },
   "repository": {
     "type": "git",
@@ -22,6 +23,7 @@
     "sendover": "^1.1.1"
   },
   "devDependencies": {
-    "jest": "^28.0.3"
+    "jest": "^28.0.3",
+    "standard": "^17.0.0"
   }
 }

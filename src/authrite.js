@@ -41,21 +41,28 @@ class Authrite {
         requestedCertificates: [] // TODO: provide requested certificates
       }
     )
-
+    console.log('Server Response: ', serverResponse)
     // Populate server parameters
-    if (serverResponse.authrite === AUTHRITE_VERSION && serverResponse.messageType === 'initialRequest') {
+    if (serverResponse.authrite === AUTHRITE_VERSION && serverResponse.messageType === 'initialResponse') {
       // Validate server signature
       // 1. Obtain the public key
       const signingPublicKey = getPaymentAddress({
         senderPrivateKey: this.clientPrivateKey,
-        recipientPublicKey: this.serverPublicKey,
-        invoiceNumber: 'authrite message signature-' + this.clientNonce + ' ' + this.serverNonce,
+        recipientPublicKey: serverResponse.identityKey,
+        invoiceNumber: 'authrite message signature-' + this.clientNonce + ' ' + serverResponse.nonce,
         returnType: 'publicKey'
       })
       // 2. Construct the message for verification
-      const messageToVerify = this.clientNonce + this.serverNonce
+      const messageToVerify = this.clientNonce + serverResponse.nonce
       // 3. Verify the signature
-      const verified = bsv.crypto.ECDSA.verify(bsv.crypto.Hash.sha256(messageToVerify), serverResponse.signature, bsv.PublicKey.fromString(signingPublicKey))
+      const signature = bsv.crypto.Signature.fromString(serverResponse.signature)
+      console.log('Signature: ' + signature)
+      console.log('Message to verify: ' + messageToVerify)
+      const verified = bsv.crypto.ECDSA.verify(
+        bsv.crypto.Hash.sha256(Buffer.from(messageToVerify)),
+        signature,
+        bsv.PublicKey.fromString(signingPublicKey)
+      )
 
       if (verified) {
         this.serverIdentityPublicKey = serverResponse.identityKey
@@ -63,9 +70,10 @@ class Authrite {
         this.serverRequestedCertificates = serverResponse.requestedCertificates // TODO: check certs
       } else {
         // Handle Error case
+        throw new Error('Unable to verify server signature!')
       }
     } else {
-      // DO something
+      throw new Error('Authrite version incompatible')
     }
   }
 
@@ -75,7 +83,7 @@ class Authrite {
    * @param {String} path used for the request
    * @param {String} data requested from the server
    */
-  async request (method = this.initalRequestMethod, path = this.initialRequestPath, data) {
+  async request (method, path, data, headers) {
     // Check for server parameters
     if (!this.serverIdentityPublicKey || !this.serverNonce) {
       await this.getServerParameters()
