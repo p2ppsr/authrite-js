@@ -18,6 +18,7 @@
   "homepage": "https://github.com/p2ppsr/authrite-js#readme",
   "dependencies": {
     "boomerang-http": "^0.1.0",
-    "bsv": "^1.5.6"
+    "bsv": "^1.5.6",
+    "sendover": "^1.1.1"
   }
 }
