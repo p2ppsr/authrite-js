@@ -3,57 +3,77 @@ const bsv = require('bsv')
 const crypto = require('crypto')
 const { getPaymentAddress } = require('sendover')
 
-// Client member data
 const AUTHRITE_VERSION = '0.1'
+
+/**
+ * Defines an Authrite Client
+ * @params {String} privateKey of client
+ */
+class Client {
+  constructor (privateKey) {
+    this.privateKey = privateKey
+    this.publicKey = bsv.PrivateKey.fromHex(privateKey).publicKey.toString()
+    this.nonce = crypto.randomBytes(32).toString('base64')
+  }
+}
+/**
+ * Defines an Authrite Server
+ * @params {String} baseUrl of the server
+ * @params {String} identityPublicKey of server
+ * @params {String} nonce
+ * @params {String} certificates provided by the server
+ * @params {String} requestedCertificates from the server
+ */
+class Server {
+  constructor (baseUrl, identityPublicKey, nonce, certificates, requestedCertificates) {
+    this.baseUrl = baseUrl
+    this.identityPublicKey = identityPublicKey
+    this.nonce = nonce
+    this.certificates = certificates
+    this.requestedCertificates = requestedCertificates
+  }
+}
 
 class Authrite {
   /**
     * Authrite Constructor
-    * @param {String} server initiating  the request
+    * @param {String} serverUrl initiating  the request
     * @param {String} clientPrivateKey used for derivations
     * @param {String} initialRequestPath
     * @param {String} initialRequestMethod
     */
-  constructor ({ server, clientPrivateKey, initialRequestPath = '/authrite/initialRequest', initialRequestMethod = 'POST' }) {
-    this.server = server
-    this.serverIdentityPublicKey = null
-    this.serverNonce = null
-    this.serverCertificates = [] // TODO: add support
-    this.serverRequestedCertificates = [] // TODO: add support
-    this.clientNonce = crypto.randomBytes(32).toString('base64')
-    this.clientPrivateKey = clientPrivateKey
-    this.clientPublicKey = bsv.PrivateKey.fromHex(clientPrivateKey).publicKey.toString()
+  constructor ({ serverUrl, clientPrivateKey, initialRequestPath = '/authrite/initialRequest', initialRequestMethod = 'POST' }) {
     this.initialRequestPath = initialRequestPath
     this.initalRequestMethod = initialRequestMethod
+    this.client = new Client(clientPrivateKey)
+    this.server = new Server(serverUrl, null, null, [], [])
   }
 
-  // Get initial server parameters
+  // Fetch initial server parameters
   async getServerParameters () {
-    // Fetch server parameters
     const serverResponse = await boomerang(
       this.initalRequestMethod,
-      this.server + this.initialRequestPath,
+      this.server.baseUrl + this.initialRequestPath,
       {
         authrite: AUTHRITE_VERSION,
         messageType: 'initialRequest',
-        identityKey: this.clientPublicKey,
-        nonce: this.clientNonce,
-        requestedCertificates: [] // TODO: provide requested certificates
+        identityKey: this.client.publicKey,
+        nonce: this.client.nonce,
+        requestedCertificates: this.server.requestedCertificates // TODO: provide requested certificates
       }
     )
     console.log('Server Response: ', serverResponse)
-    // Populate server parameters
     if (serverResponse.authrite === AUTHRITE_VERSION && serverResponse.messageType === 'initialResponse') {
       // Validate server signature
       // 1. Obtain the public key
       const signingPublicKey = getPaymentAddress({
-        senderPrivateKey: this.clientPrivateKey,
+        senderPrivateKey: this.client.privateKey,
         recipientPublicKey: serverResponse.identityKey,
-        invoiceNumber: 'authrite message signature-' + this.clientNonce + ' ' + serverResponse.nonce,
+        invoiceNumber: 'authrite message signature-' + this.client.nonce + ' ' + serverResponse.nonce,
         returnType: 'publicKey'
       })
       // 2. Construct the message for verification
-      const messageToVerify = this.clientNonce + serverResponse.nonce
+      const messageToVerify = this.client.nonce + serverResponse.nonce
       // 3. Verify the signature
       const signature = bsv.crypto.Signature.fromString(serverResponse.signature)
       console.log('Signature: ' + signature)
@@ -63,13 +83,12 @@ class Authrite {
         signature,
         bsv.PublicKey.fromString(signingPublicKey)
       )
-
+      // Determine if the signature was verified
       if (verified) {
-        this.serverIdentityPublicKey = serverResponse.identityKey
-        this.serverNonce = serverResponse.nonce
-        this.serverRequestedCertificates = serverResponse.requestedCertificates // TODO: check certs
+        this.server.identityPublicKey = serverResponse.identityKey
+        this.server.nonce = serverResponse.nonce
+        this.server.requestedCertificates = serverResponse.requestedCertificates // TODO: check certs
       } else {
-        // Handle Error case
         throw new Error('Unable to verify server signature!')
       }
     } else {
@@ -78,14 +97,15 @@ class Authrite {
   }
 
   /**
-  reates a new signed authrite request
+  Creates a new signed authrite request
    * @param {String} method The request type to use
    * @param {String} path used for the request
-   * @param {String} data requested from the server
+   * @param {Object} data requested from the server
+   * @param {Object} headers to include in the request
    */
   async request (method, path, data, headers) {
     // Check for server parameters
-    if (!this.serverIdentityPublicKey || !this.serverNonce) {
+    if (!this.server.identityPublicKey || !this.server.nonce) {
       await this.getServerParameters()
     }
     // TODO: Create a request signature using client key, server key, client-generated nonce, and server nonce.

@@ -16,30 +16,34 @@ describe('authrite', () => {
   })
   it('populates a new authrite instance', () => {
     const client = new Authrite({
-      server: 'https://server.com',
+      serverUrl: 'https://server.com',
       clientPrivateKey: TEST_CLIENT_PRIVATE_KEY,
       initialRequestPath: '/authrite/initialRequest',
       initialRequestMethod: 'POST'
     })
     const expectedClient = {
-      server: 'https://server.com',
-      serverIdentityPublicKey: null,
-      serverNonce: null,
-      serverCertificates: [],
-      serverRequestedCertificates: [],
-      clientNonce: expect.any(String),
-      clientPrivateKey: TEST_CLIENT_PRIVATE_KEY,
-      clientPublicKey: '0408c91c1361546c46672cd2c4c7fba7799e785edef509802fd966ad4cce13ad2e038590f44656cf1ae962e21b72039c8579b637c13401317592746db05e443dcd',
+      initalRequestMethod: 'POST',
       initialRequestPath: '/authrite/initialRequest',
-      initalRequestMethod: 'POST'
+      client: {
+        nonce: expect.any(String),
+        privateKey: TEST_CLIENT_PRIVATE_KEY,
+        publicKey: '0408c91c1361546c46672cd2c4c7fba7799e785edef509802fd966ad4cce13ad2e038590f44656cf1ae962e21b72039c8579b637c13401317592746db05e443dcd'
+      },
+      server: {
+        baseUrl: 'https://server.com',
+        certificates: [],
+        identityPublicKey: null,
+        nonce: null,
+        requestedCertificates: []
+      }
     }
     expect(JSON.parse(JSON.stringify(client))).toEqual(
       expectedClient
     )
   })
   it('performs an initial server request', async () => {
-    const client = new Authrite({
-      server: 'https://server.com',
+    const authrite = new Authrite({
+      serverUrl: 'https://server.com',
       clientPrivateKey: TEST_CLIENT_PRIVATE_KEY,
       initialRequestPath: '/authrite/initialRequest',
       initialRequestMethod: 'POST'
@@ -65,22 +69,22 @@ describe('authrite', () => {
         signature: signature.toString()
       }
     })
-    console.log('Client Before: ', client)
-    await client.request('POST', 'server_url',
+    console.log('Client Before: ', authrite)
+    await authrite.request('POST', 'server_url',
       {
         data: 'somedata'
       },
       {}
     )
-    console.log('Client After Request: ', client)
+    console.log('Client After Request: ', authrite)
     expect(boomerang).toHaveBeenCalledWith(
       'POST',
       'https://server.com/authrite/initialRequest',
       {
         authrite: '0.1',
         messageType: 'initialRequest',
-        identityKey: client.clientPublicKey,
-        nonce: client.clientNonce,
+        identityKey: authrite.client.publicKey,
+        nonce: authrite.client.nonce,
         requestedCertificates: [] // TODO: provide requested certificates
       })
   })
