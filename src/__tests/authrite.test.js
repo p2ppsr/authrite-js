@@ -4,6 +4,7 @@ const boomerang = require('boomerang-http')
 const sendover = require('sendover')
 const { Authrite } = require('../authrite')
 const crypto = require('crypto')
+const fetchMock = require('fetch-mock')
 
 jest.mock('boomerang-http')
 

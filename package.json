@@ -20,9 +20,11 @@
   "dependencies": {
     "boomerang-http": "^0.1.0",
     "bsv": "^1.5.6",
+    "node-fetch": "^3.2.4",
     "sendover": "^1.1.1"
   },
   "devDependencies": {
+    "fetch-mock": "^9.11.0",
     "jest": "^28.0.3",
     "standard": "^17.0.0"
   }
