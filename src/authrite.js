@@ -3,14 +3,15 @@ const bsv = require('bsv')
 const crypto = require('crypto')
 const { getPaymentAddress, getPaymentPrivateKey } = require('sendover')
 // The correct versions of EventSource and fetch should be used
-let fetch
-if (typeof window !== 'undefined') {
-  fetch = typeof window.fetch !== 'undefined'
-    ? window.fetch
-    : require('node-fetch')
-} else {
-  fetch = require('node-fetch')
-}
+// let fetch
+// if (typeof window !== 'undefined') {
+//   fetch = typeof window.fetch !== 'undefined'
+//     ? window.fetch
+//     : require('node-fetch')
+// } else {
+//   fetch = require('node-fetch')
+// }
+const fetch = require('node-fetch')
 
 const AUTHRITE_VERSION = '0.1'
 
@@ -90,7 +91,7 @@ class Authrite {
         requestedCertificates: this.server.requestedCertificates // TODO: provide requested certificates
       }
     )
-    console.log('Server Response: ', serverResponse)
+    // console.log('Server Response: ', serverResponse)
     if (serverResponse.authrite === AUTHRITE_VERSION && serverResponse.messageType === 'initialResponse') {
       // Validate server signature
       // 1. Obtain the public key
@@ -99,8 +100,8 @@ class Authrite {
       const messageToVerify = this.client.nonce + serverResponse.nonce
       // 3. Verify the signature
       const signature = bsv.crypto.Signature.fromString(serverResponse.signature)
-      console.log('Signature: ' + signature)
-      console.log('Message to verify: ' + messageToVerify)
+      // console.log('Signature: ' + signature)
+      // console.log('Message to verify: ' + messageToVerify)
       const verified = bsv.crypto.ECDSA.verify(
         bsv.crypto.Hash.sha256(Buffer.from(messageToVerify)),
         signature,
@@ -126,7 +127,8 @@ class Authrite {
    * @param {Object} payload requested from the server
    * @param {Object} headers to include in the request
    */
-  async request (routePath, fetchConfig) {
+  async request (routePath, fetchConfig = {}) {
+    console.time()
     // Check for server parameters
     if (!this.server.identityPublicKey || !this.server.nonce) {
       await this.getServerParameters()
@@ -148,6 +150,7 @@ class Authrite {
     )
     // Include X-Authrite-Signature and X-Authrite-Nonce headers
     // Send the signed Authrite request with the HTTP headers according to the specification.
+    console.timeEnd()
     const response = await fetch(
       this.server.baseUrl + routePath,
       {
