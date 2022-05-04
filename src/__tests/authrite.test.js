@@ -13,11 +13,11 @@ const TEST_SERVER_PRIVATE_KEY = '6dcc124be5f382be631d49ba12f61adbce33a5ac14f6dde
 
 describe('authrite', () => {
   beforeEach(() => {
-    fetchMock.mock('http://server.com/apiRoute', 200)
+    fetchMock.mock('https://server.com/apiRoute', 200)
   })
   afterEach(() => {
     jest.clearAllMocks()
-    fetchMock.reset()
+    fetchMock.restore()
   })
   it('populates a new authrite instance', () => {
     const authrite = new Authrite({
@@ -104,8 +104,6 @@ describe('authrite', () => {
         invoiceNumber: 'authrite message signature-' + data.nonce + ' ' + serverNonce,
         returnType: 'hex'
       })
-      const payload = data.payload
-      console.log('Payload: ', payload)
       const signature = bsv.crypto.ECDSA.sign(bsv.crypto.Hash.sha256(Buffer.from(message)), bsv.PrivateKey.fromHex(derivedPrivateKey))
       return {
         authrite: '0.1',
@@ -117,27 +115,9 @@ describe('authrite', () => {
         signature: signature.toString()
       }
     })
-    console.log('Client Before: ', authrite)
-    await authrite.request('POST', '/routepath',
-      {
-        data: 'Hello Authrite!'
-      },
-      {}
-    )
-    console.log('Client After Request: ', authrite)
-    expect(boomerang).toHaveBeenCalledWith(
-      'POST',
-      'https://server.com/authrite/initialRequest',
-      {
-        authrite: '0.1',
-        messageType: 'initialRequest',
-        identityKey: authrite.client.publicKey,
-        nonce: authrite.client.nonce,
-        requestedCertificates: [] // TODO: provide requested certificates
-      }
-    )
-    expect(boomerang).toHaveBeenLastCalledWith(
-      'POST',
+    await authrite.request('/apiRoute')
+    // How to check fetch mock?
+    expect(fetchMock).toHaveBeenLastCalledWith(
       'https://server.com/routepath',
       {
         authrite: '0.1',

@@ -7,11 +7,11 @@ const { getPaymentAddress, getPaymentPrivateKey } = require('sendover')
 // if (typeof window !== 'undefined') {
 //   fetch = typeof window.fetch !== 'undefined'
 //     ? window.fetch
-//     : require('node-fetch')
+//     : require('isomorphic-fetch')
 // } else {
-//   fetch = require('node-fetch')
+//   fetch = require('isomorphic-fetch')
 // }
-const fetch = require('node-fetch')
+const fetch = require('isomorphic-fetch')
 
 const AUTHRITE_VERSION = '0.1'
 
@@ -128,7 +128,6 @@ class Authrite {
    * @param {Object} headers to include in the request
    */
   async request (routePath, fetchConfig = {}) {
-    console.time()
     // Check for server parameters
     if (!this.server.identityPublicKey || !this.server.nonce) {
       await this.getServerParameters()
@@ -150,7 +149,6 @@ class Authrite {
     )
     // Include X-Authrite-Signature and X-Authrite-Nonce headers
     // Send the signed Authrite request with the HTTP headers according to the specification.
-    console.timeEnd()
     const response = await fetch(
       this.server.baseUrl + routePath,
       {
@@ -177,7 +175,9 @@ class Authrite {
     // 2. Construct the message for verification
     const messageToVerify = response.body
     // 3. Verify the signature
-    const signature = bsv.crypto.Signature.fromString(response.headers['X-Authrite-Signature'])
+    const signature = bsv.crypto.Signature.fromString(
+      response.headers['X-Authrite-Signature']
+    )
     console.log('Signature: ' + signature)
     console.log('Message to verify: ' + messageToVerify)
     const verified = bsv.crypto.ECDSA.verify(
