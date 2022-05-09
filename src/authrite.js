@@ -127,29 +127,37 @@ class Authrite {
       invoiceNumber: 'authrite message signature-' + requestNonce + ' ' + this.server.nonce,
       returnType: 'hex'
     })
-    // Check if a fetchConfig was passed in
-    const dataToSign = !fetchConfig.payload ? this.server.baseUrl + routePath : JSON.stringify(fetchConfig.payload)
+    // Check if a fetchConfig has data that was passed in
+    const dataToSign = Object.keys(fetchConfig).length === 0 ? this.server.baseUrl + routePath : JSON.stringify(fetchConfig.payload)
     const requestSignature = bsv.crypto.ECDSA.sign(
       bsv.crypto.Hash.sha256(Buffer.from(dataToSign)),
       bsv.PrivateKey.fromHex(derivedClientPrivateKey)
     )
     // Send the signed Authrite request with the HTTP headers according to the specification
+    let fetchRequest = {
+      headers: {
+        ...fetchConfig.headers,
+        'Content-Type': 'application/json',
+        'X-Authrite': AUTHRITE_VERSION,
+        'X-Authrite-Identity-Key': this.client.publicKey,
+        'X-Authrite-Nonce': requestNonce,
+        'X-Authrite-YourNonce': this.server.nonce,
+        'X-Authrite-Certificates': this.client.certificates,
+        'X-Authrite-Signature': requestSignature.toString()
+      }
+    }
+    // Check if the user is trying to send a payload
+    if (fetchConfig.payload) {
+      fetchRequest = {
+        body: JSON.stringify(fetchConfig.payload),
+        method: fetchConfig.method ? fetchConfig.method : 'POST',
+        ...fetchRequest
+      }
+    }
+    // Send the fetch node request and get the response
     const response = await fetch(
       this.server.baseUrl + routePath,
-      {
-        body: JSON.stringify(fetchConfig.payload),
-        method: fetchConfig.method,
-        headers: {
-          ...fetchConfig.headers,
-          'Content-Type': 'application/json',
-          'X-Authrite': AUTHRITE_VERSION,
-          'X-Authrite-Identity-Key': this.client.publicKey,
-          'X-Authrite-Nonce': requestNonce,
-          'X-Authrite-YourNonce': this.server.nonce,
-          'X-Authrite-Certificates': this.client.certificates,
-          'X-Authrite-Signature': requestSignature.toString()
-        }
-      }
+      fetchRequest
     )
     if (!response) {
       throw new Error('Failed to get response from server!')
