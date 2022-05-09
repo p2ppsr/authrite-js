@@ -7,9 +7,9 @@ let fetch
 if (typeof window !== 'undefined') {
   fetch = typeof window.fetch !== 'undefined'
     ? window.fetch
-    : require('isomorphic-fetch')
+    : require('node-fetch')
 } else {
-  fetch = require('isomorphic-fetch')
+  fetch = require('node-fetch')
 }
 
 const AUTHRITE_VERSION = '0.1'
@@ -115,7 +115,7 @@ class Authrite {
     if (!this.server.identityPublicKey || !this.server.nonce) {
       await this.getServerParameters()
     }
-    // For subsequent requests, 
+    // For subsequent requests,
     // we want to generates a new requestNonce
     // and use it together with the server’s initialNonce for key derivation
     const requestNonce = crypto.randomBytes(32).toString('base64')
@@ -125,7 +125,8 @@ class Authrite {
       invoiceNumber: 'authrite message signature-' + requestNonce + ' ' + this.server.nonce,
       returnType: 'hex'
     })
-    const dataToSign = fetchConfig.payload ? fetchConfig.payload.toString() : this.server.baseUrl + routePath
+    // Check if a fetchConfig was passed in
+    const dataToSign = !fetchConfig.payload ? this.server.baseUrl + routePath : JSON.stringify(fetchConfig.payload)
     const requestSignature = bsv.crypto.ECDSA.sign(
       bsv.crypto.Hash.sha256(Buffer.from(dataToSign)),
       bsv.PrivateKey.fromHex(derivedClientPrivateKey)
@@ -134,9 +135,11 @@ class Authrite {
     const response = await fetch(
       this.server.baseUrl + routePath,
       {
-        ...fetchConfig,
+        body: JSON.stringify(fetchConfig.payload),
+        method: fetchConfig.method,
         headers: {
           ...fetchConfig.headers,
+          'Content-Type': 'application/json',
           'X-Authrite': AUTHRITE_VERSION,
           'X-Authrite-Identity-Key': this.client.publicKey,
           'X-Authrite-Nonce': requestNonce,
@@ -153,14 +156,15 @@ class Authrite {
     const signingPublicKey = getPaymentAddress({
       senderPrivateKey: this.client.privateKey,
       recipientPublicKey: this.server.identityPublicKey,
-      invoiceNumber: 'authrite message signature-' + requestNonce + ' ' + response.headers['X-Authrite-Nonce'],
+      invoiceNumber: 'authrite message signature-' + requestNonce + ' ' + response.headers.get('X-Authrite-Nonce'),
       returnType: 'publicKey'
     })
+
     // 2. Construct the message for verification
-    const messageToVerify = JSON.stringify(response.body)
+    const messageToVerify = await response.arrayBuffer()
     // 3. Verify the signature
     const signature = bsv.crypto.Signature.fromString(
-      response.headers['X-Authrite-Signature']
+      response.headers.get('x-authrite-signature')
     )
     const verified = bsv.crypto.ECDSA.verify(
       bsv.crypto.Hash.sha256(Buffer.from(messageToVerify)),
@@ -168,7 +172,10 @@ class Authrite {
       bsv.PublicKey.fromString(signingPublicKey)
     )
     if (verified) {
-      return response
+      return {
+        headers: response.headers,
+        body: messageToVerify
+      }
     } else {
       throw new Error('Unable to verify server response')
     }
