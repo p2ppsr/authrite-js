@@ -47,16 +47,18 @@ class Server {
 class Authrite {
   /**
     * Authrite Constructor
-    * @param {String} serverUrl initiating  the request
+    * @param {String} baseUrl initiating  the request
     * @param {String} clientPrivateKey used for derivations
     * @param {String} initialRequestPath
     * @param {String} initialRequestMethod
     */
-  constructor ({ serverUrl, clientPrivateKey, initialRequestPath = '/authrite/initialRequest', initialRequestMethod = 'POST' }) {
+  constructor ({ baseUrl, clientPrivateKey, initialRequestPath = '/authrite/initialRequest', initialRequestMethod = 'POST' }) {
     this.initialRequestPath = initialRequestPath
     this.initalRequestMethod = initialRequestMethod
+    if (!clientPrivateKey) throw new Error('Please provide a valid client private key!')
     this.client = new Client(clientPrivateKey)
-    this.server = new Server(serverUrl, null, null, [], [])
+    if (!baseUrl) throw new Error('Please provide a valid base server URL!')
+    this.server = new Server(baseUrl, null, null, [], [])
   }
 
   // Fetch initial server parameters

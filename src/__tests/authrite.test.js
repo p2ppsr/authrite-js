@@ -4,10 +4,10 @@ const boomerang = require('boomerang-http')
 const sendover = require('sendover')
 const { Authrite } = require('../authrite')
 const crypto = require('crypto')
-const fetch = require('isomorphic-fetch')
+const fetch = require('node-fetch')
 
 jest.mock('boomerang-http')
-jest.mock('isomorphic-fetch')
+jest.mock('node-fetch')
 
 const TEST_CLIENT_PRIVATE_KEY = '0d7889a0e56684ba795e9b1e28eb906df43454f8172ff3f6807b8cf9464994df'
 const TEST_SERVER_PRIVATE_KEY = '6dcc124be5f382be631d49ba12f61adbce33a5ac14f6ddee12de25272f943f8b'
@@ -64,9 +64,25 @@ describe('authrite', () => {
   afterEach(() => {
     jest.clearAllMocks()
   })
+  it('throws an error if no private key is provided', () => {
+    expect(() => new Authrite({
+      baseUrl: 'https://server.com',
+      clientPrivateKey: undefined,
+      initialRequestPath: '/authrite/initialRequest',
+      initialRequestMethod: 'POST'
+    })).toThrow('Please provide a valid client private key!')
+  })
+  it('throws an error if no base url is provided', () => {
+    expect(() => new Authrite({
+      baseUrl: undefined,
+      clientPrivateKey: TEST_CLIENT_PRIVATE_KEY,
+      initialRequestPath: '/authrite/initialRequest',
+      initialRequestMethod: 'POST'
+    })).toThrow('Please provide a valid base server URL!')
+  })
   it('populates a new authrite instance', () => {
     const authrite = new Authrite({
-      serverUrl: 'https://server.com',
+      baseUrl: 'https://server.com',
       clientPrivateKey: TEST_CLIENT_PRIVATE_KEY,
       initialRequestPath: '/authrite/initialRequest',
       initialRequestMethod: 'POST'
@@ -92,9 +108,10 @@ describe('authrite', () => {
       expectedClient
     )
   })
+  // TODO: Mock response.headers.get function
   it('performs an initial server request', async () => {
     const authrite = new Authrite({
-      serverUrl: 'https://server.com',
+      baseUrl: 'https://server.com',
       clientPrivateKey: TEST_CLIENT_PRIVATE_KEY,
       initialRequestPath: '/authrite/initialRequest',
       initialRequestMethod: 'POST'
@@ -113,7 +130,7 @@ describe('authrite', () => {
   })
   it('sends a valid signed request with empty body to the server', async () => {
     const authrite = new Authrite({
-      serverUrl: 'https://server.com',
+      baseUrl: 'https://server.com',
       clientPrivateKey: TEST_CLIENT_PRIVATE_KEY,
       initialRequestPath: '/authrite/initialRequest',
       initialRequestMethod: 'POST'
@@ -175,7 +192,7 @@ describe('authrite', () => {
   })
   it('sends a valid signed request with a payload to the server', async () => {
     const authrite = new Authrite({
-      serverUrl: 'https://server.com',
+      baseUrl: 'https://server.com',
       clientPrivateKey: TEST_CLIENT_PRIVATE_KEY,
       initialRequestPath: '/authrite/initialRequest',
       initialRequestMethod: 'POST'
@@ -220,7 +237,8 @@ describe('authrite', () => {
       payload: {
         message: 'Hello Authrite server!',
         date: new Date().getHours()
-      }
+      },
+      method: 'POST'
     })
     expect(fetch).toHaveBeenCalledWith(
       'https://server.com/apiRoute',
@@ -229,6 +247,7 @@ describe('authrite', () => {
           message: 'Hello Authrite server!',
           date: new Date().getHours()
         },
+        method: 'POST',
         headers: {
           'X-Authrite': '0.1',
           'X-Authrite-Identity-Key': clientIdentityKey,
