@@ -52,12 +52,17 @@ class Authrite {
     * @param {String} initialRequestPath
     * @param {String} initialRequestMethod
     */
-  constructor ({ baseUrl, clientPrivateKey, initialRequestPath = '/authrite/initialRequest', initialRequestMethod = 'POST' }) {
+  constructor ({
+    baseUrl,
+    clientPrivateKey,
+    initialRequestPath = '/authrite/initialRequest',
+    initialRequestMethod = 'POST'
+  }) {
     this.initialRequestPath = initialRequestPath
     this.initalRequestMethod = initialRequestMethod
     if (!clientPrivateKey) throw new Error('Please provide a valid client private key!')
-    this.client = new Client(clientPrivateKey)
     if (!baseUrl) throw new Error('Please provide a valid base server URL!')
+    this.client = new Client(clientPrivateKey)
     this.server = new Server(baseUrl, null, null, [], [])
   }
 
@@ -74,13 +79,16 @@ class Authrite {
         requestedCertificates: this.server.requestedCertificates // TODO: provide requested certificates
       }
     )
-    if (serverResponse.authrite === AUTHRITE_VERSION && serverResponse.messageType === 'initialResponse') {
+    if (
+      serverResponse.authrite === AUTHRITE_VERSION &&
+      serverResponse.messageType === 'initialResponse'
+    ) {
       // Validate server signature
       // 1. Obtain the public key
       const signingPublicKey = getPaymentAddress({
         senderPrivateKey: this.client.privateKey,
         recipientPublicKey: serverResponse.identityKey,
-        invoiceNumber: 'authrite message signature-' + this.client.nonce + ' ' + serverResponse.nonce,
+        invoiceNumber: `authrite message signature-${this.client.nonce} ${serverResponse.nonce}`,
         returnType: 'publicKey'
       })
       // 2. Construct the message for verification
@@ -106,11 +114,9 @@ class Authrite {
   }
 
   /**
-  Creates a new signed authrite request
-   * @param {String} method The request type to use
-   * @param {String} path used for the request
-   * @param {Object} payload requested from the server
-   * @param {Object} headers to include in the request
+   * Creates a new signed authrite request
+   * @param {String} routePath The path on the server to request
+   * @param {String} fetchConfig Config object passed to the [Fetch API](https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API)
    */
   async request (routePath, fetchConfig = {}) {
     // Check for server parameters
@@ -128,30 +134,25 @@ class Authrite {
       returnType: 'hex'
     })
     // Check if a fetchConfig has data that was passed in
-    const dataToSign = Object.keys(fetchConfig).length === 0 ? this.server.baseUrl + routePath : JSON.stringify(fetchConfig.payload)
+    const dataToSign = fetchConfig.body
+      ? JSON.stringify(fetchConfig.body)
+      : this.server.baseUrl + routePath
     const requestSignature = bsv.crypto.ECDSA.sign(
       bsv.crypto.Hash.sha256(Buffer.from(dataToSign)),
       bsv.PrivateKey.fromHex(derivedClientPrivateKey)
     )
     // Send the signed Authrite request with the HTTP headers according to the specification
     let fetchRequest = {
+      ...fetchConfig,
       headers: {
-        ...fetchConfig.headers,
         'Content-Type': 'application/json',
+        ...fetchConfig.headers,
         'X-Authrite': AUTHRITE_VERSION,
         'X-Authrite-Identity-Key': this.client.publicKey,
         'X-Authrite-Nonce': requestNonce,
         'X-Authrite-YourNonce': this.server.nonce,
         'X-Authrite-Certificates': this.client.certificates,
         'X-Authrite-Signature': requestSignature.toString()
-      }
-    }
-    // Check if the user is trying to send a payload
-    if (fetchConfig.payload) {
-      fetchRequest = {
-        body: JSON.stringify(fetchConfig.payload),
-        method: fetchConfig.method ? fetchConfig.method : 'POST',
-        ...fetchRequest
       }
     }
     // Send the fetch node request and get the response
