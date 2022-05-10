@@ -133,62 +133,76 @@ class Authrite {
       invoiceNumber: 'authrite message signature-' + requestNonce + ' ' + this.server.nonce,
       returnType: 'hex'
     })
-    // Check if a fetchConfig has data that was passed in
-    const dataToSign = fetchConfig.body
-      ? JSON.stringify(fetchConfig.body)
-      : this.server.baseUrl + routePath
-    const requestSignature = bsv.crypto.ECDSA.sign(
-      bsv.crypto.Hash.sha256(Buffer.from(dataToSign)),
-      bsv.PrivateKey.fromHex(derivedClientPrivateKey)
-    )
-    // Send the signed Authrite request with the HTTP headers according to the specification
-    let fetchRequest = {
-      ...fetchConfig,
-      headers: {
-        'Content-Type': 'application/json',
-        ...fetchConfig.headers,
-        'X-Authrite': AUTHRITE_VERSION,
-        'X-Authrite-Identity-Key': this.client.publicKey,
-        'X-Authrite-Nonce': requestNonce,
-        'X-Authrite-YourNonce': this.server.nonce,
-        'X-Authrite-Certificates': this.client.certificates,
-        'X-Authrite-Signature': requestSignature.toString()
+    let response
+    try {
+      // Check if a fetchConfig has data that was passed in
+      const dataToSign = fetchConfig.body
+        ? JSON.stringify(JSON.parse(fetchConfig.body))
+        : this.server.baseUrl + routePath
+      const requestSignature = bsv.crypto.ECDSA.sign(
+        bsv.crypto.Hash.sha256(Buffer.from(dataToSign)),
+        bsv.PrivateKey.fromHex(derivedClientPrivateKey)
+      )
+      // Default method for a request containing a body is POST
+      if (fetchConfig.body && !fetchConfig.method) {
+        fetchConfig.method = 'POST'
       }
+      // Send the signed Authrite fetch request with the HTTP headers according to the specification
+      // The user can specify any type of content, pass in the correct body,
+      // and the node fetch API will try to handle it automatically.
+      // [FetchAPI Body](https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API/Using_Fetch#body)
+      response = await fetch(
+        this.server.baseUrl + routePath,
+        {
+          ...fetchConfig,
+          headers: {
+            'Content-Type': 'application/json',
+            ...fetchConfig.headers,
+            'X-Authrite': AUTHRITE_VERSION,
+            'X-Authrite-Identity-Key': this.client.publicKey,
+            'X-Authrite-Nonce': requestNonce,
+            'X-Authrite-YourNonce': this.server.nonce,
+            'X-Authrite-Certificates': this.client.certificates,
+            'X-Authrite-Signature': requestSignature.toString()
+          }
+        }
+      )
+    } catch (error) {
+      throw new Error(`FetchConfig not configured correctly! ErrorMessage: ${error.message}`)
     }
-    // Send the fetch node request and get the response
-    const response = await fetch(
-      this.server.baseUrl + routePath,
-      fetchRequest
-    )
     if (!response) {
       throw new Error('Failed to get response from server!')
     }
-    // When the server response comes back, validate the signature according to the specification
-    const signingPublicKey = getPaymentAddress({
-      senderPrivateKey: this.client.privateKey,
-      recipientPublicKey: this.server.identityPublicKey,
-      invoiceNumber: 'authrite message signature-' + requestNonce + ' ' + response.headers.get('X-Authrite-Nonce'),
-      returnType: 'publicKey'
-    })
+    try {
+      // When the server response comes back, validate the signature according to the specification
+      const signingPublicKey = getPaymentAddress({
+        senderPrivateKey: this.client.privateKey,
+        recipientPublicKey: this.server.identityPublicKey,
+        invoiceNumber: 'authrite message signature-' + requestNonce + ' ' + response.headers.get('X-Authrite-Nonce'),
+        returnType: 'publicKey'
+      })
 
-    // 2. Construct the message for verification
-    const messageToVerify = await response.arrayBuffer()
-    // 3. Verify the signature
-    const signature = bsv.crypto.Signature.fromString(
-      response.headers.get('x-authrite-signature')
-    )
-    const verified = bsv.crypto.ECDSA.verify(
-      bsv.crypto.Hash.sha256(Buffer.from(messageToVerify)),
-      signature,
-      bsv.PublicKey.fromString(signingPublicKey)
-    )
-    if (verified) {
-      return {
-        headers: response.headers,
-        body: messageToVerify
+      // 2. Construct the message for verification
+      const messageToVerify = await response.arrayBuffer()
+      // 3. Verify the signature
+      const signature = bsv.crypto.Signature.fromString(
+        response.headers.get('x-authrite-signature')
+      )
+      const verified = bsv.crypto.ECDSA.verify(
+        bsv.crypto.Hash.sha256(Buffer.from(messageToVerify)),
+        signature,
+        bsv.PublicKey.fromString(signingPublicKey)
+      )
+      if (verified) {
+        return {
+          headers: response.headers,
+          body: messageToVerify
+        }
+      } else {
+        throw new Error('Unable to verify server response')
       }
-    } else {
-      throw new Error('Unable to verify server response')
+    } catch (error) {
+      throw new Error('Server could not find Authrite headers in request from client!')
     }
   }
 }
