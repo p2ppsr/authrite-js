@@ -2,6 +2,7 @@ const boomerang = require('boomerang-http')
 const bsv = require('bsv')
 const crypto = require('crypto')
 const { getPaymentAddress, getPaymentPrivateKey } = require('sendover')
+const { getDataToSign } = require('./utils/getDataToSign')
 // The correct versions of EventSource and fetch should be used
 let fetch
 if (typeof window !== 'undefined') {
@@ -135,18 +136,19 @@ class Authrite {
     })
     let response
     try {
+      // Default method and header for a request containing a body
+      if (fetchConfig.body) {
+        fetchConfig.method ??= 'POST'
+        fetchConfig.headers ??= {
+          'Content-Type': 'application/json'
+        }
+      }
       // Check if a fetchConfig has data that was passed in
-      const dataToSign = fetchConfig.body
-        ? JSON.stringify(JSON.parse(fetchConfig.body))
-        : this.server.baseUrl + routePath
+      const dataToSign = getDataToSign(fetchConfig, this.server.baseUrl + routePath)
       const requestSignature = bsv.crypto.ECDSA.sign(
         bsv.crypto.Hash.sha256(Buffer.from(dataToSign)),
         bsv.PrivateKey.fromHex(derivedClientPrivateKey)
       )
-      // Default method for a request containing a body is POST
-      if (fetchConfig.body && !fetchConfig.method) {
-        fetchConfig.method = 'POST'
-      }
       // Send the signed Authrite fetch request with the HTTP headers according to the specification
       // The user can specify any type of content, pass in the correct body,
       // and the node fetch API will try to handle it automatically.
@@ -156,7 +158,6 @@ class Authrite {
         {
           ...fetchConfig,
           headers: {
-            'Content-Type': 'application/json',
             ...fetchConfig.headers,
             'X-Authrite': AUTHRITE_VERSION,
             'X-Authrite-Identity-Key': this.client.publicKey,
