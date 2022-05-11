@@ -62,7 +62,7 @@ class Authrite {
   }) {
     this.initialRequestPath = initialRequestPath
     this.initalRequestMethod = initialRequestMethod
-    if (!clientPrivateKey) throw new Error('Please provide a valid client private key!')
+    if (!clientPrivateKey || Buffer.byteLength(clientPrivateKey, 'hex') !== 32) throw new Error('Please provide a valid client private key!')
     if (!baseUrl) throw new Error('Please provide a valid base server URL!')
     this.client = new Client(clientPrivateKey)
     this.server = new Server(baseUrl, null, null, [], [])
@@ -119,7 +119,7 @@ class Authrite {
    * Creates a new signed authrite request
    * @param {String} routePath The path on the server to request
    * @param {object} fetchConfig Config object passed to the [Fetch API](https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API)
-   * @returns {object} The response object. Fields are 'headers' and 'body' (containing messageToVerify) 
+   * @returns {object} The response object. Fields are 'headers' and 'body' (containing messageToVerify)
    */
   async request (routePath, fetchConfig = {}) {
     // Check for server parameters
@@ -172,11 +172,23 @@ class Authrite {
           }
         }
       )
+      if (!response) {
+        throw new Error('Failed to get response from server!')
+      }
+      // Provide better error messages depending on the status code
+      let customErrorMessage
+      switch (response.status) {
+        case 404:
+          customErrorMessage = `Route ${response.statusText}`
+          break
+        default:
+          customErrorMessage = response.statusText
+      }
+      if (response.status !== 200 && response.status) {
+        throw new Error(customErrorMessage)
+      }
     } catch (error) {
       throw new Error(`FetchConfig not configured correctly! ErrorMessage: ${error.message}`)
-    }
-    if (!response) {
-      throw new Error('Failed to get response from server!')
     }
     try {
       // When the server response comes back, validate the signature according to the specification
@@ -186,7 +198,6 @@ class Authrite {
         invoiceNumber: 'authrite message signature-' + requestNonce + ' ' + response.headers.get('X-Authrite-Nonce'),
         returnType: 'publicKey'
       })
-
       // 2. Construct the message for verification
       const messageToVerify = await response.arrayBuffer()
       // 3. Verify the signature
@@ -207,7 +218,7 @@ class Authrite {
         throw new Error('Unable to verify server response')
       }
     } catch (error) {
-      throw new Error('Server could not find Authrite headers in request from client!')
+      throw new Error(`Server could not find Authrite headers in request from client! Error Message: ${error}`)
     }
   }
 }
