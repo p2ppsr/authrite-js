@@ -5,7 +5,8 @@
   "main": "index.js",
   "scripts": {
     "test": "jest",
-    "test:watch": "jest --watch"
+    "test:watch": "jest --watch",
+    "doc": "documentation build authrite-js.js -f md > TEST.md"
   },
   "repository": {
     "type": "git",

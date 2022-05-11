@@ -16,9 +16,10 @@ if (typeof window !== 'undefined') {
 const AUTHRITE_VERSION = '0.1'
 
 /**
- * Defines an Authrite Client
- * @params {String} privateKey of client
- */
+   * Client Constructor
+   * @param {String} privateKey associated with the identityPublicKey
+   */
+
 class Client {
   constructor (privateKey) {
     this.privateKey = privateKey
@@ -27,15 +28,18 @@ class Client {
     this.certificates = []
   }
 }
+
 /**
- * Defines an Authrite Server
- * @params {String} baseUrl of the server
- * @params {String} identityPublicKey of server
- * @params {String} nonce
- * @params {String} certificates provided by the server
- * @params {String} requestedCertificates from the server
- */
+   * Server Constructor
+   * @param {String} baseUrl The baseUrl of the Server
+   * @param {String} identityPublicKey The identifier of the Server
+   * @param {String} nonce A 256 bit number converted to a base64 string
+   * @param {Array} certificates Certificate authorities of the Server
+   * @param {Object} requestedCertificates Indicates certificates requested by Client
+   */
+
 class Server {
+  
   constructor (baseUrl, identityPublicKey, nonce, certificates, requestedCertificates) {
     this.baseUrl = baseUrl
     this.identityPublicKey = identityPublicKey
