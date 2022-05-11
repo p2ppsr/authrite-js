@@ -48,10 +48,11 @@ class Server {
 class Authrite {
   /**
     * Authrite Constructor
-    * @param {String} baseUrl initiating  the request
-    * @param {String} clientPrivateKey used for derivations
-    * @param {String} initialRequestPath
-    * @param {String} initialRequestMethod
+    * @param {object} authrite
+    * @param {String} authrite.baseUrl The server baseUrl we want to talk to
+    * @param {String} authrite.clientPrivateKey The client's private key used for derivations
+    * @param {String} authrite.initialRequestPath Initial request path for establishing a connection (defaults to '/authrite/initialRequest')
+    * @param {String} authrite.initialRequestMethod Initial request method (defaults to 'POST')
     */
   constructor ({
     baseUrl,
@@ -117,7 +118,7 @@ class Authrite {
   /**
    * Creates a new signed authrite request
    * @param {String} routePath The path on the server to request
-   * @param {String} fetchConfig Config object passed to the [Fetch API](https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API)
+   * @param {object} fetchConfig Config object passed to the [Fetch API](https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API)
    */
   async request (routePath, fetchConfig = {}) {
     // Check for server parameters
