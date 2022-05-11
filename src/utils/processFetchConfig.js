@@ -7,7 +7,7 @@
 const getDataToSign = (fetchConfig, url) => {
   if (fetchConfig.body) {
     if (fetchConfig.headers['Content-Type'] === 'application/json') {
-      return JSON.stringify(JSON.parse(fetchConfig.body))
+      return typeof (fetchConfig.body) === 'string' ? fetchConfig.body : JSON.stringify(fetchConfig.body)
     } else if (fetchConfig.headers['Content-Type'] === 'text/plain') {
       // TODO
     } else if (fetchConfig.headers['Content-Type'] === 'text/html') {
@@ -16,4 +16,8 @@ const getDataToSign = (fetchConfig, url) => {
   }
   return url
 }
-module.exports = { getDataToSign }
+// Make sure the data is formatted correctly
+const formatFetchConfigBody = (fetchConfig, contentType = 'application/json') => {
+  return typeof fetchConfig.body !== 'string' ? JSON.stringify(fetchConfig.body) : fetchConfig.body
+}
+module.exports = { getDataToSign, formatFetchConfigBody }
