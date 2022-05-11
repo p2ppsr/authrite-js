@@ -2,7 +2,7 @@
 
 ## Overview
 
-Authrite is a system for the mutual authentication over a communications channel where both parties come to know the identity of the counterparty.
+Authrite is a system for mutual authentication over a communications channel where both parties come to know the identity of the counterparty.
 **authrite-js** provides an API for making authenticated HTTP requests from a client to a server that uses the authrite-express middleware.
 
 During setup, the client asks for some basic information from the server and provides their identity key. The server sends back a reply, proving custody over the identity key they send back. Then, every message sent between the two parties is signed and verified, enabling everyone to have confidence in message integrity. Messages are not encrypted by Authrite, but encryption can occur on another layer like HTTPS.
