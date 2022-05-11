@@ -52,34 +52,8 @@ init()
 
 #### Table of Contents
 
-*   [Client](#client)
-    *   [Parameters](#parameters)
-*   [Server](#server)
-    *   [Parameters](#parameters-1)
 *   [Authrite](#authrite)
-    *   [Parameters](#parameters-2)
-    *   [request](#request)
-        *   [Parameters](#parameters-3)
-
-### Client
-
-The client requesting communication with the server
-
-#### Parameters
-
-*   `privateKey` **[String](https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/String)** associated with the identityPublicKey
-
-### Server
-
-The server with whom the client is establishing authenticated communication
-
-#### Parameters
-
-*   `baseUrl` **[String](https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/String)** The baseUrl of the Server
-*   `identityPublicKey` **[String](https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/String)** The identifier of the Server
-*   `nonce` **[String](https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/String)** A 256 bit number converted to a base64 string
-*   `certificates` **[Array](https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Array)** Certificate authorities of the Server
-*   `requestedCertificates` **[Object](https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Object)** Indicates certificates requested by Client
+    *   [Parameters](#parameters)
 
 ### Authrite
 
@@ -93,18 +67,6 @@ Client-side API for establishing authenticated server communication
     *   `authrite.clientPrivateKey` **[String](https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/String)** The client's private key used for derivations
     *   `authrite.initialRequestPath` **[String](https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/String)** Initial request path for establishing a connection (optional, default `'/authrite/initialRequest'`)
     *   `authrite.initialRequestMethod` **[String](https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/String)** Initial request method (optional, default `'POST'`)
-
-#### request
-
-Creates a new signed authrite request
-
-##### Parameters
-
-*   `routePath` **[String](https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/String)** The path on the server to request
-*   `fetchConfig` **[object](https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Object)** Config object passed to the [Fetch API](https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API).
-    The current version of Authrite only supports JSON structures for the fetch body. However, you can include a [Buffer](https://nodejs.org/api/buffer.html) as part of the json object. (optional, default `{}`)
-
-Returns **[object](https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Object)** The response object. Fields are 'headers' and 'body' (containing messageToVerify)
 
 ## License
 

@@ -47,6 +47,7 @@ class Server {
 
 /**
     * Client-side API for establishing authenticated server communication
+    * @public
     * @param {object} authrite All parameters are given in an object.
     * @param {String} authrite.baseUrl The server baseUrl we want to talk to
     * @param {String} authrite.clientPrivateKey The client's private key used for derivations
