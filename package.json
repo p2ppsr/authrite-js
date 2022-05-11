@@ -6,7 +6,7 @@
   "scripts": {
     "test": "jest",
     "test:watch": "jest --watch",
-    "doc": "documentation readme src/** -f md -s authrite-js"
+    "doc": "documentation readme src/authrite.js -f md -s authrite-js"
   },
   "repository": {
     "type": "git",

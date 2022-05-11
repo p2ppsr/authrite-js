@@ -12,8 +12,6 @@
     *   [Parameters](#parameters-2)
     *   [request](#request)
         *   [Parameters](#parameters-3)
-*   [getDataToSign](#getdatatosign)
-    *   [Parameters](#parameters-4)
 
 ## Client
 
@@ -58,13 +56,3 @@ Creates a new signed authrite request
 *   `fetchConfig` **[object](https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Object)** Config object passed to the [Fetch API](https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API) (optional, default `{}`)
 
 Returns **[object](https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Object)** The response object. Fields are 'headers' and 'body' (containing messageToVerify)
-
-## getDataToSign
-
-Figure out the type of data and parse it correctly
-TODO: Add support for more types of data
-
-### Parameters
-
-*   `fetchConfig` **[object](https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Object)** Config object passed to the fetch API
-*   `url` **[string](https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/String)** The server baseUrl + the route path

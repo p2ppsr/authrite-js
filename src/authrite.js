@@ -2,7 +2,6 @@ const boomerang = require('boomerang-http')
 const bsv = require('bsv')
 const crypto = require('crypto')
 const { getPaymentAddress, getPaymentPrivateKey } = require('sendover')
-const { getDataToSign, formatFetchConfigBody } = require('./utils/processFetchConfig')
 // The correct versions of EventSource and fetch should be used
 let fetch
 if (typeof window !== 'undefined') {
@@ -139,25 +138,25 @@ class Authrite {
     })
     let response
     try {
-      // Default method and header for a request containing a body
+      // Make sure the fetchConfig body is formatted to the correct content type
+      let dataToSign
       if (fetchConfig.body) {
-        fetchConfig.method ??= 'POST'
-        fetchConfig.headers ??= {
-          'Content-Type': 'application/json'
-        }
-        // Make sure the fetchConfig body is formatted to the content type
-        fetchConfig.body = formatFetchConfigBody(fetchConfig, fetchConfig.headers['Content-Type'])
+        fetchConfig.body = typeof (fetchConfig.body) === 'string' ? fetchConfig.body : JSON.stringify(fetchConfig.body)
+        dataToSign = fetchConfig.body
+        // TODO: Check fetchConfig.headers['Content-Type'] to support other data types
+        fetchConfig.headers ??= {}
+        fetchConfig.headers['Content-Type'] ??= 'application/json'
       }
-      // Check if a fetchConfig has data that was passed in
-      const dataToSign = getDataToSign(fetchConfig, this.server.baseUrl + routePath)
+      // If the request body is empty, sign the url instead
+      dataToSign ??= this.server.baseUrl + routePath
+      // Configure default method and headers if none are provided
+      fetchConfig.method ??= 'POST'
+      // Create a request signature
       const requestSignature = bsv.crypto.ECDSA.sign(
         bsv.crypto.Hash.sha256(Buffer.from(dataToSign)),
         bsv.PrivateKey.fromHex(derivedClientPrivateKey)
       )
       // Send the signed Authrite fetch request with the HTTP headers according to the specification
-      // The user can specify any type of content, pass in the correctly formated body,
-      // and the node fetch API will try to handle it automatically.
-      // [FetchAPI Body](https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API/Using_Fetch#body)
       response = await fetch(
         this.server.baseUrl + routePath,
         {
