@@ -21,6 +21,8 @@ During setup, the client asks for some basic information from the server and pro
     *   [Parameters](#parameters-2)
     *   [request](#request)
         *   [Parameters](#parameters-3)
+*   [Example Usage](#example-usage)
+    
 
 ### Client
 
@@ -112,7 +114,7 @@ Creates a new signed authrite request
 
 Returns **[object](https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Object)** The response object. Fields are 'headers' and 'body' (containing messageToVerify)
 
-## Example Usage
+## [Example Usage](#example-usuage)
 
 This example demonstrates sending a simple request sent with **authrite-js**
 
@@ -120,7 +122,8 @@ This example demonstrates sending a simple request sent with **authrite-js**
 const { Authrite } = require('authrite-js')
 
 // Authrite required parameters
-const EXAMPLE_CLIENT_PRIVATE_KEY = '0d7889a0e56684ba795e9b1e28eb906df43454f8172ff3f6807b8cf9464994df'
+const EXAMPLE_CLIENT_PRIVATE_KEY = 
+'0d7889a0e56684ba795e9b1e28eb906df43454f8172ff3f6807b8cf9464994df'
 const EXAMPLE_SERVER_BASEURL = 'http://localhost:5000'
 
 const init = async () => {
