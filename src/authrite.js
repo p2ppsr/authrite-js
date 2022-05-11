@@ -16,10 +16,9 @@ if (typeof window !== 'undefined') {
 const AUTHRITE_VERSION = '0.1'
 
 /**
-   * Client Constructor
+   * The client requesting communication with the server
    * @param {String} privateKey associated with the identityPublicKey
    */
-
 class Client {
   constructor (privateKey) {
     this.privateKey = privateKey
@@ -30,16 +29,14 @@ class Client {
 }
 
 /**
-   * Server Constructor
+   * The server with whom the client is establishing authenticated communication
    * @param {String} baseUrl The baseUrl of the Server
    * @param {String} identityPublicKey The identifier of the Server
    * @param {String} nonce A 256 bit number converted to a base64 string
    * @param {Array} certificates Certificate authorities of the Server
    * @param {Object} requestedCertificates Indicates certificates requested by Client
    */
-
 class Server {
-  
   constructor (baseUrl, identityPublicKey, nonce, certificates, requestedCertificates) {
     this.baseUrl = baseUrl
     this.identityPublicKey = identityPublicKey
@@ -49,15 +46,15 @@ class Server {
   }
 }
 
-class Authrite {
-  /**
-    * Authrite Constructor
-    * @param {object} authrite
+/**
+    * Client-side API for establishing authenticated server communication
+    * @param {object} authrite All parameters are given in an object.
     * @param {String} authrite.baseUrl The server baseUrl we want to talk to
     * @param {String} authrite.clientPrivateKey The client's private key used for derivations
-    * @param {String} authrite.initialRequestPath Initial request path for establishing a connection (defaults to '/authrite/initialRequest')
-    * @param {String} authrite.initialRequestMethod Initial request method (defaults to 'POST')
+    * @param {String} authrite.initialRequestPath Initial request path for establishing a connection
+    * @param {String} authrite.initialRequestMethod Initial request method
     */
+class Authrite {
   constructor ({
     baseUrl,
     clientPrivateKey,
@@ -123,6 +120,7 @@ class Authrite {
    * Creates a new signed authrite request
    * @param {String} routePath The path on the server to request
    * @param {object} fetchConfig Config object passed to the [Fetch API](https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API)
+   * @returns {object} The response object. Fields are 'headers' and 'body' (containing messageToVerify) 
    */
   async request (routePath, fetchConfig = {}) {
     // Check for server parameters
