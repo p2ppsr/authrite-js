@@ -118,7 +118,8 @@ class Authrite {
   /**
    * Creates a new signed authrite request
    * @param {String} routePath The path on the server to request
-   * @param {object} fetchConfig Config object passed to the [Fetch API](https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API)
+   * @param {object} fetchConfig Config object passed to the [Fetch API](https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API). 
+   * The current version of Authrite only supports JSON structures for the fetch body. However, you can include a [Buffer](https://nodejs.org/api/buffer.html) as part of the json object.
    * @returns {object} The response object. Fields are 'headers' and 'body' (containing messageToVerify)
    */
   async request (routePath, fetchConfig = {}) {
