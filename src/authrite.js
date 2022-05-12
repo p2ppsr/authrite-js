@@ -117,6 +117,7 @@ class Authrite {
   }
 
   /**
+   * @public
    * Creates a new signed authrite request
    * @param {String} routePath The path on the server to request
    * @param {object} fetchConfig Config object passed to the [Fetch API](https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API). 

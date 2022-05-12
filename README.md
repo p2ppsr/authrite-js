@@ -1,13 +1,21 @@
 # authrite-js
 
+JavaScript client for Authrite
+
+The code is available [on GitHub](https://github.com/p2ppsr/authrite-js) and the package is published [on NPM](https://www.npmjs.com/package/authrite-js).
+
 ## Overview
 
-Authrite is a system for mutual authentication over a communications channel where both parties come to know the identity of the counterparty.
+[Authrite](https://projectbabbage.com/authrite) is a system for mutual authentication over a communications channel where both parties come to know the identity of the counterparty.
 **authrite-js** provides an API for making authenticated HTTP requests from a client to a server that uses the authrite-express middleware.
 
-During setup, the client asks for some basic information from the server and provides their identity key. The server sends back a reply, proving custody over the identity key they send back. Then, every message sent between the two parties is signed and verified, enabling everyone to have confidence in message integrity. Messages are not encrypted by Authrite, but encryption can occur on another layer like HTTPS.
+During setup, the client asks for some basic information from the server and provides their identity key. The server sends back a reply, proving custody over the identity key they send back. Then, every message sent between the two parties is signed and verified, enabling everyone to have confidence in message integrity. Messages are not encrypted by Authrite, but encryption is provided by HTTPS.
 
-## [Example Usage](#example-usuage)
+## Installation
+
+    npm i authrite-js
+
+## Example Usage
 
 This example demonstrates sending a simple request sent with **authrite-js**
 
@@ -54,6 +62,8 @@ init()
 
 *   [Authrite](#authrite)
     *   [Parameters](#parameters)
+    *   [request](#request)
+        *   [Parameters](#parameters-1)
 
 ### Authrite
 
@@ -67,6 +77,16 @@ Client-side API for establishing authenticated server communication
     *   `authrite.clientPrivateKey` **[String](https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/String)** The client's private key used for derivations
     *   `authrite.initialRequestPath` **[String](https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/String)** Initial request path for establishing a connection (optional, default `'/authrite/initialRequest'`)
     *   `authrite.initialRequestMethod` **[String](https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/String)** Initial request method (optional, default `'POST'`)
+
+#### request
+
+##### Parameters
+
+*   `routePath` **[String](https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/String)** The path on the server to request
+*   `fetchConfig` **[object](https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Object)** Config object passed to the [Fetch API](https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API).
+    The current version of Authrite only supports JSON structures for the fetch body. However, you can include a [Buffer](https://nodejs.org/api/buffer.html) as part of the json object. (optional, default `{}`)
+
+Returns **[object](https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Object)** The response object. Fields are 'headers' and 'body' (containing messageToVerify)
 
 ## License
 
