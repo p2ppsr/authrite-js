@@ -1,8 +1,8 @@
 {
   "name": "authrite-js",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "A system for mutual authentication of two parties over a communications channel",
-  "main": "src/index.js",
+  "main": "src/authrite.js",
   "scripts": {
     "test": "jest",
     "test:watch": "jest --watch",
@@ -13,7 +13,7 @@
     "url": "git+https://github.com/p2ppsr/authrite-js.git"
   },
   "author": "Peer-to-peer Privacy Systems Research, LLC",
-  "license": "ISC",
+  "license": "Open BSV License",
   "bugs": {
     "url": "https://github.com/p2ppsr/authrite-js/issues"
   },
