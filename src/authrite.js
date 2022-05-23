@@ -2,6 +2,7 @@ const boomerang = require('boomerang-http')
 const bsv = require('bsv')
 const crypto = require('crypto')
 const { getPaymentAddress, getPaymentPrivateKey } = require('sendover')
+const url = require('url')
 // The correct versions of EventSource and fetch should be used
 let fetch
 if (typeof window !== 'undefined') {
@@ -52,37 +53,37 @@ class Authrite {
    * Client-side API for establishing authenticated server communication
    * @public
    * @param {object} authrite All parameters are given in an object.
-   * @param {String} authrite.baseUrl The server baseUrl we want to talk to
    * @param {String} authrite.clientPrivateKey The client's private key used for derivations
    * @param {String} authrite.initialRequestPath Initial request path for establishing a connection
-   * @param {String} authrite.initialRequestMethod Initial request method
    * @constructor
    */
   constructor ({
-    baseUrl,
     clientPrivateKey,
-    initialRequestPath = '/authrite/initialRequest',
-    initialRequestMethod = 'POST'
+    initialRequestPath = '/authrite/initialRequest'
   }) {
-    this.initialRequestPath = initialRequestPath
-    this.initalRequestMethod = initialRequestMethod
     if (!clientPrivateKey || Buffer.byteLength(clientPrivateKey, 'hex') !== 32) throw new Error('Please provide a valid client private key!')
-    if (!baseUrl) throw new Error('Please provide a valid base server URL!')
-    this.client = new Client(clientPrivateKey)
-    this.server = new Server(baseUrl, null, null, [], [])
+    this.clientPrivateKey = clientPrivateKey
+    this.initialRequestPath = initialRequestPath
+    /*
+      Servers and Clients are objects whose keys are base URLs and whose values are instances of the Server or Client class.
+    */
+    this.servers = {}
+    this.clients = {}
   }
 
   // Fetch initial server parameters
-  async getServerParameters () {
+  async getServerParameters (baseUrl) {
+    this.clients[baseUrl] = new Client(this.clientPrivateKey)
+    this.servers[baseUrl] = new Server(baseUrl, null, null, [], [])
     const serverResponse = await boomerang(
-      this.initalRequestMethod,
-      this.server.baseUrl + this.initialRequestPath,
+      'POST',
+      baseUrl + this.initialRequestPath,
       {
         authrite: AUTHRITE_VERSION,
         messageType: 'initialRequest',
-        identityKey: this.client.publicKey,
-        nonce: this.client.nonce,
-        requestedCertificates: this.server.requestedCertificates // TODO: provide requested certificates
+        identityKey: this.clients[baseUrl].publicKey,
+        nonce: this.clients[baseUrl].nonce,
+        requestedCertificates: this.servers[baseUrl].requestedCertificates // TODO: provide requested certificates
       }
     )
     if (
@@ -92,13 +93,13 @@ class Authrite {
       // Validate server signature
       // 1. Obtain the public key
       const signingPublicKey = getPaymentAddress({
-        senderPrivateKey: this.client.privateKey,
+        senderPrivateKey: this.clients[baseUrl].privateKey,
         recipientPublicKey: serverResponse.identityKey,
-        invoiceNumber: `authrite message signature-${this.client.nonce} ${serverResponse.nonce}`,
+        invoiceNumber: `authrite message signature-${this.clients[baseUrl].nonce} ${serverResponse.nonce}`,
         returnType: 'publicKey'
       })
       // 2. Construct the message for verification
-      const messageToVerify = this.client.nonce + serverResponse.nonce
+      const messageToVerify = this.clients[baseUrl].nonce + serverResponse.nonce
       // 3. Verify the signature
       const signature = bsv.crypto.Signature.fromString(serverResponse.signature)
       const verified = bsv.crypto.ECDSA.verify(
@@ -108,9 +109,9 @@ class Authrite {
       )
       // Determine if the signature was verified
       if (verified) {
-        this.server.identityPublicKey = serverResponse.identityKey
-        this.server.nonce = serverResponse.nonce
-        this.server.requestedCertificates = serverResponse.requestedCertificates // TODO: check certs
+        this.servers[baseUrl].identityPublicKey = serverResponse.identityKey
+        this.servers[baseUrl].nonce = serverResponse.nonce
+        this.servers[baseUrl].requestedCertificates = serverResponse.requestedCertificates // TODO: check certs
       } else {
         throw new Error('Unable to verify server signature!')
       }
@@ -121,24 +122,34 @@ class Authrite {
 
   /**
    * @public
-   * Creates a new signed authrite request
-   * @param {String} routePath The path on the server to request
+   * Creates a new signed authrite request and returns the result
+   * @param {String} requestUrl The URL to request on an Authrite-enabled server
    * @param {object} fetchConfig Config object passed to the [Fetch API](https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API). The current version of Authrite only supports JSON structures for the fetch body. However, you can include a [Buffer](https://nodejs.org/api/buffer.html) as part of the json object.
    * @returns {object} The response object. Fields are 'status', 'headers' and 'body' (containing an ArrayBuffer of the HTTP response body)
    */
-  async request (routePath, fetchConfig = {}) {
+  async request (requestUrl, fetchConfig = {}) {
+    // Extract baseUrl from URL
+    const parsedUrl = new url.URL(requestUrl)
+    if (!parsedUrl.host) {
+      throw new Error('Invalid request URL!')
+    }
+    const baseUrl = `${parsedUrl.protocol}//${parsedUrl.host}`
     // Check for server parameters
-    if (!this.server.identityPublicKey || !this.server.nonce) {
-      await this.getServerParameters()
+    if (
+      !this.servers[baseUrl] ||
+      !this.servers[baseUrl].identityPublicKey ||
+      !this.servers[baseUrl].nonce
+    ) {
+      await this.getServerParameters(baseUrl)
     }
     // For subsequent requests,
     // we want to generates a new requestNonce
     // and use it together with the server’s initialNonce for key derivation
     const requestNonce = crypto.randomBytes(32).toString('base64')
     const derivedClientPrivateKey = getPaymentPrivateKey({
-      recipientPrivateKey: this.client.privateKey,
-      senderPublicKey: this.server.identityPublicKey,
-      invoiceNumber: 'authrite message signature-' + requestNonce + ' ' + this.server.nonce,
+      recipientPrivateKey: this.clients[baseUrl].privateKey,
+      senderPublicKey: this.servers[baseUrl].identityPublicKey,
+      invoiceNumber: 'authrite message signature-' + requestNonce + ' ' + this.servers[baseUrl].nonce,
       returnType: 'hex'
     })
     // Make sure the fetchConfig body is formatted to the correct content type
@@ -151,7 +162,7 @@ class Authrite {
       fetchConfig.headers['Content-Type'] ??= 'application/json'
     }
     // If the request body is empty, sign the url instead
-    dataToSign ??= this.server.baseUrl + routePath
+    dataToSign ??= requestUrl
     // Configure default method and headers if none are provided
     fetchConfig.method ??= 'POST'
     // Create a request signature
@@ -161,24 +172,24 @@ class Authrite {
     )
     // Send the signed Authrite fetch request with the HTTP headers according to the specification
     const response = await fetch(
-      this.server.baseUrl + routePath,
+      requestUrl,
       {
         ...fetchConfig,
         headers: {
           ...fetchConfig.headers,
           'X-Authrite': AUTHRITE_VERSION,
-          'X-Authrite-Identity-Key': this.client.publicKey,
+          'X-Authrite-Identity-Key': this.clients[baseUrl].publicKey,
           'X-Authrite-Nonce': requestNonce,
-          'X-Authrite-YourNonce': this.server.nonce,
-          'X-Authrite-Certificates': this.client.certificates,
+          'X-Authrite-YourNonce': this.servers[baseUrl].nonce,
+          'X-Authrite-Certificates': this.clients[baseUrl].certificates,
           'X-Authrite-Signature': requestSignature.toString()
         }
       }
     )
     // When the server response comes back, validate the signature according to the specification
     const signingPublicKey = getPaymentAddress({
-      senderPrivateKey: this.client.privateKey,
-      recipientPublicKey: this.server.identityPublicKey,
+      senderPrivateKey: this.clients[baseUrl].privateKey,
+      recipientPublicKey: this.servers[baseUrl].identityPublicKey,
       invoiceNumber: 'authrite message signature-' + requestNonce + ' ' + response.headers.get('X-Authrite-Nonce'),
       returnType: 'publicKey'
     })
@@ -200,8 +211,9 @@ class Authrite {
         body: messageToVerify
       }
     } else {
-      throw new Error('Unable to verify server response')
+      throw new Error('Unable to verify Authrite server response signature!')
     }
   }
 }
+
 module.exports = { Authrite }
