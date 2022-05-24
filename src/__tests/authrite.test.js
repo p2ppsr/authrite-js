@@ -49,18 +49,21 @@ describe('authrite', () => {
         bsv.crypto.Hash.sha256(Buffer.from(JSON.stringify(message))),
         bsv.PrivateKey.fromHex(derivedPrivateKey)
       )
+      const headers = {
+        'x-authrite': '0.1',
+        'x-authrite-identity-key': bsv.PrivateKey.fromHex(TEST_SERVER_PRIVATE_KEY).publicKey.toString(),
+        'x-authrite-nonce': serverNonce,
+        'x-authrite-yournonce': fetchConfig.headers['X-Authrite-Nonce'],
+        'x-authrite-certificates': [],
+        'x-authrite-signature': responseSignature.toString()
+      }
       return {
+        arrayBuffer: () => Buffer.from(JSON.stringify(message), 'utf8'),
         body: message,
         status: 200,
         headers: {
-          'X-Authrite': '0.1',
-          'X-Authrite-Identity-Key': bsv.PrivateKey.fromHex(TEST_SERVER_PRIVATE_KEY).publicKey.toString(),
-          'X-Authrite-Nonce': serverNonce,
-          'X-Authrite-YourNonce': fetchConfig.headers['X-Authrite-Nonce'],
-          'X-Authrite-Certificates': [],
-          'X-Authrite-Signature': responseSignature.toString(),
-          get: jest.fn(() => ''),
-          arrayBuffer: jest.fn(() => '')
+          ...headers,
+          get: jest.fn(x => headers[x.toLowerCase()])
         }
       }
     })
@@ -84,200 +87,203 @@ describe('authrite', () => {
       initialRequestMethod: 'POST'
     })).toThrow('Please provide a valid client private key!')
   }, 100000)
-  it('throws an error if no base url is provided', () => {
-    expect(() => new Authrite({
-      baseUrl: undefined,
-      clientPrivateKey: TEST_CLIENT_PRIVATE_KEY,
-      initialRequestPath: '/authrite/initialRequest',
-      initialRequestMethod: 'POST'
-    })).toThrow('Please provide a valid base server URL!')
-  })
   it('populates a new authrite instance', () => {
     const authrite = new Authrite({
-      baseUrl: 'https://server.com',
       clientPrivateKey: TEST_CLIENT_PRIVATE_KEY,
-      initialRequestPath: '/authrite/initialRequest',
-      initialRequestMethod: 'POST'
+      initialRequestPath: '/authrite/initialRequest'
     })
     const expectedClient = {
-      initalRequestMethod: 'POST',
       initialRequestPath: '/authrite/initialRequest',
-      client: {
-        nonce: expect.any(String),
-        privateKey: TEST_CLIENT_PRIVATE_KEY,
-        publicKey: '0408c91c1361546c46672cd2c4c7fba7799e785edef509802fd966ad4cce13ad2e038590f44656cf1ae962e21b72039c8579b637c13401317592746db05e443dcd',
-        certificates: []
+      clientPrivateKey: TEST_CLIENT_PRIVATE_KEY,
+      clients: {},
+      servers: {}
+    }
+    expect(JSON.parse(JSON.stringify(authrite))).toEqual(
+      expectedClient
+    )
+  })
+  // ---
+  it('performs an initial server request', async () => {
+    const authrite = new Authrite({
+      clientPrivateKey: TEST_CLIENT_PRIVATE_KEY
+    })
+    await authrite.request('https://server.com/apiRoute')
+    expect(boomerang).toHaveBeenCalledWith(
+      'POST',
+      'https://server.com/authrite/initialRequest',
+      {
+        authrite: '0.1',
+        messageType: 'initialRequest',
+        identityKey: authrite.clients['https://server.com'].publicKey,
+        nonce: authrite.clients['https://server.com'].nonce,
+        requestedCertificates: [] // TODO: provide requested certificates
+      })
+    const expectedClient = {
+      initialRequestPath: '/authrite/initialRequest',
+      clientPrivateKey: TEST_CLIENT_PRIVATE_KEY,
+      clients: {
+        'https://server.com': {
+          certificates: [],
+          nonce: expect.any(String),
+          privateKey: '0d7889a0e56684ba795e9b1e28eb906df43454f8172ff3f6807b8cf9464994df',
+          publicKey: '0408c91c1361546c46672cd2c4c7fba7799e785edef509802fd966ad4cce13ad2e038590f44656cf1ae962e21b72039c8579b637c13401317592746db05e443dcd'
+        }
       },
-      server: {
-        baseUrl: 'https://server.com',
-        certificates: [],
-        identityPublicKey: null,
-        nonce: null,
-        requestedCertificates: []
+      servers: {
+        'https://server.com': {
+          baseUrl: 'https://server.com',
+          certificates: [],
+          identityPublicKey: '04b51d497f8c67c1416cfe1a58daa5a576a63eb0b64608922d5c4f98b6a1d9b103f9c42cd08b1376ec1932be02c7debdc5314fa563d383d61f8110a5df910bc719',
+          nonce: expect.any(String),
+          requestedCertificates: []
+        }
       }
     }
     expect(JSON.parse(JSON.stringify(authrite))).toEqual(
       expectedClient
     )
   })
+  it('sends a valid signed request with empty body to the server', async () => {
+    const authrite = new Authrite({
+      baseUrl: 'https://server.com',
+      clientPrivateKey: TEST_CLIENT_PRIVATE_KEY,
+      initialRequestPath: '/authrite/initialRequest',
+      initialRequestMethod: 'POST'
+    })
 
-  // [REMOVE TESTS] Integration testing covers these tests
-  // it('performs an initial server request', async () => {
-  //   const authrite = new Authrite({
-  //     baseUrl: 'https://server.com',
-  //     clientPrivateKey: TEST_CLIENT_PRIVATE_KEY,
-  //     initialRequestPath: '/authrite/initialRequest',
-  //     initialRequestMethod: 'POST'
-  //   })
-  //   await authrite.request('/apiRoute')
-  //   expect(boomerang).toHaveBeenCalledWith(
-  //     'POST',
-  //     'https://server.com/authrite/initialRequest',
-  //     {
-  //       authrite: '0.1',
-  //       messageType: 'initialRequest',
-  //       identityKey: authrite.client.publicKey,
-  //       nonce: authrite.client.nonce,
-  //       requestedCertificates: [] // TODO: provide requested certificates
-  //     })
-  // })
-  // it('sends a valid signed request with empty body to the server', async () => {
-  //   const authrite = new Authrite({
-  //     baseUrl: 'https://server.com',
-  //     clientPrivateKey: TEST_CLIENT_PRIVATE_KEY,
-  //     initialRequestPath: '/authrite/initialRequest',
-  //     initialRequestMethod: 'POST'
-  //   })
+    // Save the client's headers so we can verify the fetch request for testing
+    let clientIdentityKey = ''
+    let clientNonce = ''
+    let clientSig = ''
+    let responseMessage = ''
+    fetch.mockImplementation(async (url, fetchConfig) => {
+      // Generate a new server nonce to use for signing the response
+      const serverNonce = crypto.randomBytes(32).toString('base64')
+      // Temporarily save client request info for testing purposes
+      clientIdentityKey = fetchConfig.headers['X-Authrite-Identity-Key']
+      clientNonce = fetchConfig.headers['X-Authrite-Nonce']
+      clientSig = fetchConfig.headers['X-Authrite-Signature']
+      responseMessage = {
+        message: 'hello Authrite'
+      }
+      const derivedPrivateKey = sendover.getPaymentPrivateKey({
+        recipientPrivateKey: TEST_SERVER_PRIVATE_KEY,
+        senderPublicKey: fetchConfig.headers['X-Authrite-Identity-Key'],
+        invoiceNumber: 'authrite message signature-' + fetchConfig.headers['X-Authrite-Nonce'] + ' ' + serverNonce,
+        returnType: 'hex'
+      })
+      const responseSignature = bsv.crypto.ECDSA.sign(
+        bsv.crypto.Hash.sha256(Buffer.from(JSON.stringify(responseMessage))),
+        bsv.PrivateKey.fromHex(derivedPrivateKey))
+      const headers = {
+        'x-authrite': '0.1',
+        'x-authrite-identity-key': bsv.PrivateKey.fromHex(TEST_SERVER_PRIVATE_KEY).publicKey.toString(),
+        'x-authrite-nonce': serverNonce,
+        'x-authrite-yournonce': fetchConfig.headers['X-Authrite-Nonce'],
+        'x-authrite-certificates': [],
+        'x-authrite-signature': responseSignature.toString()
+      }
+      return {
+        arrayBuffer: () => Buffer.from(JSON.stringify(responseMessage), 'utf8'),
+        body: responseMessage,
+        headers: {
+          ...headers,
+          get: jest.fn(x => headers[x.toLowerCase()])
+        }
+      }
+    })
+    // Make a request with no fetchConfig object
+    const response = await authrite.request('https://server.com/apiRoute')
+    expect(fetch).toHaveBeenCalledWith(
+      'https://server.com/apiRoute',
+      {
+        method: 'POST',
+        headers: {
+          'X-Authrite': '0.1',
+          'X-Authrite-Identity-Key': clientIdentityKey,
+          'X-Authrite-Nonce': clientNonce,
+          'X-Authrite-YourNonce': expect.any(String),
+          'X-Authrite-Certificates': [],
+          'X-Authrite-Signature': clientSig
+        }
+      }
+    )
+    // Verify that the response signature was verified by the client
+    expect(JSON.parse(response.body.toString('utf8'))).toEqual(responseMessage)
+  })
+  it('sends a valid signed request with a payload to the server', async () => {
+    const authrite = new Authrite({
+      clientPrivateKey: TEST_CLIENT_PRIVATE_KEY,
+      initialRequestPath: '/authrite/initialRequest'
+    })
 
-  //   // Save the client's headers so we can verify the fetch request for testing
-  //   let clientIdentityKey = ''
-  //   let clientNonce = ''
-  //   let clientSig = ''
-  //   let responseMessage = ''
-  //   fetch.mockImplementation(async (url, fetchConfig) => {
-  //     // Generate a new server nonce to use for signing the response
-  //     const serverNonce = crypto.randomBytes(32).toString('base64')
-  //     // Temporarily save client request info for testing purposes
-  //     clientIdentityKey = fetchConfig.headers['X-Authrite-Identity-Key']
-  //     clientNonce = fetchConfig.headers['X-Authrite-Nonce']
-  //     clientSig = fetchConfig.headers['X-Authrite-Signature']
-  //     responseMessage = {
-  //       message: 'hello Authrite'
-  //     }
-  //     const derivedPrivateKey = sendover.getPaymentPrivateKey({
-  //       recipientPrivateKey: TEST_SERVER_PRIVATE_KEY,
-  //       senderPublicKey: fetchConfig.headers['X-Authrite-Identity-Key'],
-  //       invoiceNumber: 'authrite message signature-' + fetchConfig.headers['X-Authrite-Nonce'] + ' ' + serverNonce,
-  //       returnType: 'hex'
-  //     })
-  //     const responseSignature = bsv.crypto.ECDSA.sign(
-  //       bsv.crypto.Hash.sha256(Buffer.from(JSON.stringify(responseMessage))),
-  //       bsv.PrivateKey.fromHex(derivedPrivateKey))
-  //     return {
-  //       body: responseMessage,
-  //       headers: {
-  //         'X-Authrite': '0.1',
-  //         'X-Authrite-Identity-Key': bsv.PrivateKey.fromHex(TEST_SERVER_PRIVATE_KEY).publicKey.toString(),
-  //         'X-Authrite-Nonce': serverNonce,
-  //         'X-Authrite-YourNonce': fetchConfig.headers['X-Authrite-Nonce'],
-  //         'X-Authrite-Certificates': [],
-  //         'X-Authrite-Signature': responseSignature.toString(),
-  //         get: jest.fn(() => ''),
-  //         arrayBuffer: jest.fn(() => '')
-  //       }
-  //     }
-  //   })
-  //   // Make a request with no fetchConfig object
-  //   const response = await authrite.request('/apiRoute')
-  //   expect(fetch).toHaveBeenCalledWith(
-  //     'https://server.com/apiRoute',
-  //     {
-  //       headers: {
-  //         'X-Authrite': '0.1',
-  //         'X-Authrite-Identity-Key': clientIdentityKey,
-  //         'X-Authrite-Nonce': clientNonce,
-  //         'X-Authrite-YourNonce': expect.any(String),
-  //         'X-Authrite-Certificates': [],
-  //         'X-Authrite-Signature': clientSig
-  //       }
-  //     }
-  //   )
-  //   // Verify that the response signature was verified by the client
-  //   expect(response.body).toEqual(responseMessage)
-  // })
-  // it('sends a valid signed request with a payload to the server', async () => {
-  //   const authrite = new Authrite({
-  //     baseUrl: 'https://server.com',
-  //     clientPrivateKey: TEST_CLIENT_PRIVATE_KEY,
-  //     initialRequestPath: '/authrite/initialRequest',
-  //     initialRequestMethod: 'POST'
-  //   })
-
-  //   // Save the client's headers so we can verify the fetch request for testing
-  //   let clientIdentityKey = ''
-  //   let clientNonce = ''
-  //   let clientSig = ''
-  //   let responseMessage = ''
-  //   fetch.mockImplementation(async (url, fetchConfig) => {
-  //     clientIdentityKey = fetchConfig.headers['X-Authrite-Identity-Key']
-  //     clientNonce = fetchConfig.headers['X-Authrite-Nonce']
-  //     const serverNonce = crypto.randomBytes(32).toString('base64')
-  //     clientSig = fetchConfig.headers['X-Authrite-Signature']
-  //     responseMessage = {
-  //       message: 'hello Authrite'
-  //     }
-  //     const derivedPrivateKey = sendover.getPaymentPrivateKey({
-  //       recipientPrivateKey: TEST_SERVER_PRIVATE_KEY,
-  //       senderPublicKey: fetchConfig.headers['X-Authrite-Identity-Key'],
-  //       invoiceNumber: 'authrite message signature-' + fetchConfig.headers['X-Authrite-Nonce'] + ' ' + serverNonce,
-  //       returnType: 'hex'
-  //     })
-  //     const responseSignature = bsv.crypto.ECDSA.sign(
-  //       bsv.crypto.Hash.sha256(Buffer.from(JSON.stringify(responseMessage))),
-  //       bsv.PrivateKey.fromHex(derivedPrivateKey))
-  //     return {
-  //       body: responseMessage,
-  //       headers: {
-  //         'X-Authrite': '0.1',
-  //         'X-Authrite-Identity-Key': bsv.PrivateKey.fromHex(TEST_SERVER_PRIVATE_KEY).publicKey.toString(),
-  //         'X-Authrite-Nonce': serverNonce,
-  //         'X-Authrite-YourNonce': fetchConfig.headers['X-Authrite-Nonce'],
-  //         'X-Authrite-Certificates': [],
-  //         'X-Authrite-Signature': responseSignature.toString(),
-  //         get: jest.fn(() => ''),
-  //         arrayBuffer: jest.fn(() => '')
-  //       }
-  //     }
-  //   })
-  //   // Include fetchConfig with a payload in the request
-  //   const response = await authrite.request('/apiRoute', {
-  //     payload: {
-  //       message: 'Hello Authrite server!',
-  //       date: new Date().getHours()
-  //     },
-  //     method: 'POST'
-  //   })
-  //   expect(fetch).toHaveBeenCalledWith(
-  //     'https://server.com/apiRoute',
-  //     {
-  //       payload: {
-  //         message: 'Hello Authrite server!',
-  //         date: new Date().getHours()
-  //       },
-  //       method: 'POST',
-  //       headers: {
-  //         'X-Authrite': '0.1',
-  //         'X-Authrite-Identity-Key': clientIdentityKey,
-  //         'X-Authrite-Nonce': clientNonce,
-  //         'X-Authrite-YourNonce': expect.any(String),
-  //         'X-Authrite-Certificates': [],
-  //         'X-Authrite-Signature': clientSig,
-  //         get: jest.fn(() => ''),
-  //         arrayBuffer: jest.fn(() => '')
-  //       }
-  //     }
-  //   )
-  //   // Verify that the response signature was verified by the client
-  //   expect(response.body).toEqual(responseMessage)
-  // })
+    // Save the client's headers so we can verify the fetch request for testing
+    let clientIdentityKey = ''
+    let clientNonce = ''
+    let clientSig = ''
+    let responseMessage = ''
+    fetch.mockImplementation(async (url, fetchConfig) => {
+      clientIdentityKey = fetchConfig.headers['X-Authrite-Identity-Key']
+      clientNonce = fetchConfig.headers['X-Authrite-Nonce']
+      const serverNonce = crypto.randomBytes(32).toString('base64')
+      clientSig = fetchConfig.headers['X-Authrite-Signature']
+      responseMessage = {
+        message: 'hello Authrite'
+      }
+      const derivedPrivateKey = sendover.getPaymentPrivateKey({
+        recipientPrivateKey: TEST_SERVER_PRIVATE_KEY,
+        senderPublicKey: fetchConfig.headers['X-Authrite-Identity-Key'],
+        invoiceNumber: 'authrite message signature-' + fetchConfig.headers['X-Authrite-Nonce'] + ' ' + serverNonce,
+        returnType: 'hex'
+      })
+      const responseSignature = bsv.crypto.ECDSA.sign(
+        bsv.crypto.Hash.sha256(Buffer.from(JSON.stringify(responseMessage))),
+        bsv.PrivateKey.fromHex(derivedPrivateKey))
+      const headers = {
+        'x-authrite': '0.1',
+        'x-authrite-identity-key': bsv.PrivateKey.fromHex(TEST_SERVER_PRIVATE_KEY).publicKey.toString(),
+        'x-authrite-nonce': serverNonce,
+        'x-authrite-yournonce': fetchConfig.headers['X-Authrite-Nonce'],
+        'x-authrite-certificates': [],
+        'x-authrite-signature': responseSignature.toString()
+      }
+      return {
+        arrayBuffer: () => Buffer.from(JSON.stringify(responseMessage), 'utf8'),
+        body: responseMessage,
+        headers: {
+          ...headers,
+          get: jest.fn(x => headers[x.toLowerCase()])
+        }
+      }
+    })
+    // Include fetchConfig with a payload in the request
+    const response = await authrite.request('https://server.com/apiRoute', {
+      body: {
+        message: 'Hello Authrite server!',
+        date: new Date().getHours()
+      },
+      method: 'POST'
+    })
+    expect(fetch).toHaveBeenCalledWith(
+      'https://server.com/apiRoute',
+      {
+        body: JSON.stringify({
+          message: 'Hello Authrite server!',
+          date: new Date().getHours()
+        }),
+        method: 'POST',
+        headers: {
+          'X-Authrite': '0.1',
+          'X-Authrite-Identity-Key': clientIdentityKey,
+          'X-Authrite-Nonce': clientNonce,
+          'X-Authrite-YourNonce': expect.any(String),
+          'X-Authrite-Certificates': [],
+          'X-Authrite-Signature': clientSig,
+          'Content-Type': 'application/json'
+        }
+      }
+    )
+    // Verify that the response signature was verified by the client
+    expect(JSON.parse(response.body.toString('utf8'))).toEqual(responseMessage)
+  })
 })

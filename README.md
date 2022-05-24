@@ -73,16 +73,14 @@ Client-side API for establishing authenticated server communication
 
 *   `authrite` **[object](https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Object)** All parameters are given in an object.
 
-    *   `authrite.baseUrl` **[String](https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/String)** The server baseUrl we want to talk to
     *   `authrite.clientPrivateKey` **[String](https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/String)** The client's private key used for derivations
     *   `authrite.initialRequestPath` **[String](https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/String)** Initial request path for establishing a connection (optional, default `'/authrite/initialRequest'`)
-    *   `authrite.initialRequestMethod` **[String](https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/String)** Initial request method (optional, default `'POST'`)
 
 ### request
 
 #### Parameters
 
-*   `routePath` **[String](https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/String)** The path on the server to request
+*   `requestUrl` **[String](https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/String)** The URL to request on an Authrite-enabled server
 *   `fetchConfig` **[object](https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Object)** Config object passed to the [Fetch API](https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API). The current version of Authrite only supports JSON structures for the fetch body. However, you can include a [Buffer](https://nodejs.org/api/buffer.html) as part of the json object. (optional, default `{}`)
 
 Returns **[object](https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Object)** The response object. Fields are 'status', 'headers' and 'body' (containing an ArrayBuffer of the HTTP response body)
