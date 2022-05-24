@@ -25,13 +25,11 @@ const { Authrite } = require('authrite-js')
 // Authrite required parameters
 const EXAMPLE_CLIENT_PRIVATE_KEY = 
 '0d7889a0e56684ba795e9b1e28eb906df43454f8172ff3f6807b8cf9464994df'
-const EXAMPLE_SERVER_BASEURL = 'http://localhost:5000'
 
 const init = async () => {
     // Create a new instance of the Authrite class
     // Provide the server baseUrl, and your private identity key
     const authrite = new Authrite({
-        baseUrl: TEST_SERVER_BASEURL,
         clientPrivateKey: TEST_CLIENT_PRIVATE_KEY
     })
     // Construct a payload to send as the body of your request
@@ -40,7 +38,7 @@ const init = async () => {
         message: 'message from client'
     }
     // Create a new request to the server
-    const response = await authrite.request('/sendSomeData', {
+    const response = await authrite.request('http://localhost:5000/sendSomeData', {
         body,
         method: 'POST',
         headers: {
