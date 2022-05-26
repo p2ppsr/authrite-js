@@ -2,15 +2,18 @@ const boomerang = require('boomerang-http')
 const bsv = require('bsv')
 const crypto = require('crypto')
 const { getPaymentAddress, getPaymentPrivateKey } = require('sendover')
-const url = require('url')
-// The correct versions of EventSource and fetch should be used
-let fetch
+// The correct versions of URL and fetch should be used
+let fetch, URL
 if (typeof window !== 'undefined') {
   fetch = typeof window.fetch !== 'undefined'
     ? window.fetch
     : require('node-fetch')
+  URL = typeof window.URL !== 'undefined'
+    ? window.URL
+    : require('url').URL
 } else {
   fetch = require('node-fetch')
+  URL = require('url').URL
 }
 
 const AUTHRITE_VERSION = '0.1'
@@ -129,7 +132,7 @@ class Authrite {
    */
   async request (requestUrl, fetchConfig = {}) {
     // Extract baseUrl from URL
-    const parsedUrl = new url.URL(requestUrl)
+    const parsedUrl = new URL(requestUrl)
     if (!parsedUrl.host) {
       throw new Error('Invalid request URL!')
     }
