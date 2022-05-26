@@ -158,13 +158,21 @@ class Authrite {
       fetchConfig.body = typeof (fetchConfig.body) === 'string' ? fetchConfig.body : JSON.stringify(fetchConfig.body)
       dataToSign = fetchConfig.body
       // TODO: Check fetchConfig.headers['Content-Type'] to support other data types
-      fetchConfig.headers ??= {}
-      fetchConfig.headers['Content-Type'] ??= 'application/json'
+      if (!fetchConfig.headers) {
+        fetchConfig.headers = {}
+      }
+      if (!fetchConfig.headers['Content-Type']) {
+        fetchConfig.headers['Content-Type'] = 'application/json'
+      }
     }
     // If the request body is empty, sign the url instead
-    dataToSign ??= requestUrl
+    if (!dataToSign) {
+      dataToSign = requestUrl
+    }
     // Configure default method and headers if none are provided
-    fetchConfig.method ??= 'POST'
+    if (!fetchConfig.method) {
+      fetchConfig.method = 'POST'
+    }
     // Create a request signature
     const requestSignature = bsv.crypto.ECDSA.sign(
       bsv.crypto.Hash.sha256(Buffer.from(dataToSign)),
