@@ -153,7 +153,7 @@ class Authrite {
       recipientPrivateKey: this.clients[baseUrl].privateKey,
       senderPublicKey: this.servers[baseUrl].identityPublicKey,
       invoiceNumber: 'authrite message signature-' + requestNonce + ' ' + this.servers[baseUrl].nonce,
-      returnType: 'hex'
+      returnType: 'wif'
     })
     // Make sure the fetchConfig body is formatted to the correct content type
     let dataToSign
@@ -179,7 +179,7 @@ class Authrite {
     // Create a request signature
     const requestSignature = bsv.crypto.ECDSA.sign(
       bsv.crypto.Hash.sha256(Buffer.from(dataToSign)),
-      bsv.PrivateKey.fromHex(derivedClientPrivateKey)
+      bsv.PrivateKey.fromWIF(derivedClientPrivateKey)
     )
     // Send the signed Authrite fetch request with the HTTP headers according to the specification
     const response = await fetch(
