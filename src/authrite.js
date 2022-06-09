@@ -163,7 +163,9 @@ class Authrite {
     let dataToSign
     // Check if we should sign the requestURL instead of the body
     // The fetch API POST request method defaults to 'GET'
-    fetchConfig.method ??= 'GET'
+    if (!fetchConfig.method) {
+      fetchConfig.method = 'GET'
+    }
     if (fetchConfig.method === 'GET' || fetchConfig.method === 'HEAD') {
       dataToSign = requestUrl
     }
