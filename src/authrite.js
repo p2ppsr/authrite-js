@@ -156,14 +156,25 @@ class Authrite {
       returnType: 'wif'
     })
     // Make sure the fetchConfig body is formatted to the correct content type
+    // TODO: Check fetchConfig.headers['Content-Type'] to support other data types
+    if (!fetchConfig.headers) {
+      fetchConfig.headers = {}
+    }
     let dataToSign
-    if (fetchConfig.body) {
-      fetchConfig.body = typeof (fetchConfig.body) === 'string' ? fetchConfig.body : JSON.stringify(fetchConfig.body)
-      dataToSign = fetchConfig.body
-      // TODO: Check fetchConfig.headers['Content-Type'] to support other data types
-      if (!fetchConfig.headers) {
-        fetchConfig.headers = {}
+    // Check if we should sign the requestURL instead of the body
+    // The fetch API POST request method defaults to 'GET'
+    fetchConfig.method ??= 'GET'
+    if (fetchConfig.method === 'GET' || fetchConfig.method === 'HEAD') {
+      dataToSign = requestUrl
+    }
+    else {
+      // The fetch API POST request body defaults to '{}'
+      if (!fetchConfig.body) {
+        fetchConfig.body = '{}'
+      } else {
+        fetchConfig.body = typeof (fetchConfig.body) === 'string' ? fetchConfig.body : JSON.stringify(fetchConfig.body)
       }
+      dataToSign = fetchConfig.body
       if (!fetchConfig.headers['Content-Type']) {
         fetchConfig.headers['Content-Type'] = 'application/json'
       }
@@ -171,10 +182,6 @@ class Authrite {
     // If the request body is empty, sign the url instead
     if (!dataToSign) {
       dataToSign = requestUrl
-    }
-    // Configure default method and headers if none are provided
-    if (!fetchConfig.method) {
-      fetchConfig.method = 'POST'
     }
     // Create a request signature
     const requestSignature = bsv.crypto.ECDSA.sign(

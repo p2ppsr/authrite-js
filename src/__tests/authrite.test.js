@@ -21,9 +21,9 @@ describe('authrite', () => {
         recipientPrivateKey: TEST_SERVER_PRIVATE_KEY,
         senderPublicKey: data.identityKey,
         invoiceNumber: 'authrite message signature-' + data.nonce + ' ' + serverNonce,
-        returnType: 'hex'
+        returnType: 'wif'
       })
-      const signature = bsv.crypto.ECDSA.sign(bsv.crypto.Hash.sha256(Buffer.from(message)), bsv.PrivateKey.fromHex(derivedPrivateKey))
+      const signature = bsv.crypto.ECDSA.sign(bsv.crypto.Hash.sha256(Buffer.from(message)), bsv.PrivateKey.fromWIF(derivedPrivateKey))
       return {
         authrite: '0.1',
         messageType: 'initialResponse',
@@ -43,11 +43,11 @@ describe('authrite', () => {
         recipientPrivateKey: TEST_SERVER_PRIVATE_KEY,
         senderPublicKey: fetchConfig.headers['X-Authrite-Identity-Key'],
         invoiceNumber: 'authrite message signature-' + fetchConfig.headers['X-Authrite-Nonce'] + ' ' + serverNonce,
-        returnType: 'hex'
+        returnType: 'wif'
       })
       const responseSignature = bsv.crypto.ECDSA.sign(
         bsv.crypto.Hash.sha256(Buffer.from(JSON.stringify(message))),
-        bsv.PrivateKey.fromHex(derivedPrivateKey)
+        bsv.PrivateKey.fromWIF(derivedPrivateKey)
       )
       const headers = {
         'x-authrite': '0.1',
@@ -73,24 +73,17 @@ describe('authrite', () => {
   })
   it('throws an error if no private key is provided', () => {
     expect(() => new Authrite({
-      baseUrl: 'https://server.com',
       clientPrivateKey: undefined,
-      initialRequestPath: '/authrite/initialRequest',
-      initialRequestMethod: 'POST'
     })).toThrow('Please provide a valid client private key!')
   })
   it('Throws an error if the client private key is not a 256-bit (32 byte) hex value', async () => {
     expect(() => new Authrite({
-      baseUrl: 'https://server.com',
       clientPrivateKey: TEST_CLIENT_PRIVATE_KEY + TEST_CLIENT_PRIVATE_KEY,
-      initialRequestPath: '/authrite/initialRequest',
-      initialRequestMethod: 'POST'
     })).toThrow('Please provide a valid client private key!')
   }, 100000)
   it('populates a new authrite instance', () => {
     const authrite = new Authrite({
       clientPrivateKey: TEST_CLIENT_PRIVATE_KEY,
-      initialRequestPath: '/authrite/initialRequest'
     })
     const expectedClient = {
       initialRequestPath: '/authrite/initialRequest',
@@ -145,10 +138,7 @@ describe('authrite', () => {
   })
   it('sends a valid signed request with empty body to the server', async () => {
     const authrite = new Authrite({
-      baseUrl: 'https://server.com',
       clientPrivateKey: TEST_CLIENT_PRIVATE_KEY,
-      initialRequestPath: '/authrite/initialRequest',
-      initialRequestMethod: 'POST'
     })
 
     // Save the client's headers so we can verify the fetch request for testing
@@ -170,11 +160,11 @@ describe('authrite', () => {
         recipientPrivateKey: TEST_SERVER_PRIVATE_KEY,
         senderPublicKey: fetchConfig.headers['X-Authrite-Identity-Key'],
         invoiceNumber: 'authrite message signature-' + fetchConfig.headers['X-Authrite-Nonce'] + ' ' + serverNonce,
-        returnType: 'hex'
+        returnType: 'wif'
       })
       const responseSignature = bsv.crypto.ECDSA.sign(
         bsv.crypto.Hash.sha256(Buffer.from(JSON.stringify(responseMessage))),
-        bsv.PrivateKey.fromHex(derivedPrivateKey))
+        bsv.PrivateKey.fromWIF(derivedPrivateKey))
       const headers = {
         'x-authrite': '0.1',
         'x-authrite-identity-key': bsv.PrivateKey.fromHex(TEST_SERVER_PRIVATE_KEY).publicKey.toString(),
@@ -197,7 +187,7 @@ describe('authrite', () => {
     expect(fetch).toHaveBeenCalledWith(
       'https://server.com/apiRoute',
       {
-        method: 'POST',
+        method: 'GET',
         headers: {
           'X-Authrite': '0.1',
           'X-Authrite-Identity-Key': clientIdentityKey,
@@ -234,11 +224,11 @@ describe('authrite', () => {
         recipientPrivateKey: TEST_SERVER_PRIVATE_KEY,
         senderPublicKey: fetchConfig.headers['X-Authrite-Identity-Key'],
         invoiceNumber: 'authrite message signature-' + fetchConfig.headers['X-Authrite-Nonce'] + ' ' + serverNonce,
-        returnType: 'hex'
+        returnType: 'wif'
       })
       const responseSignature = bsv.crypto.ECDSA.sign(
         bsv.crypto.Hash.sha256(Buffer.from(JSON.stringify(responseMessage))),
-        bsv.PrivateKey.fromHex(derivedPrivateKey))
+        bsv.PrivateKey.fromWIF(derivedPrivateKey))
       const headers = {
         'x-authrite': '0.1',
         'x-authrite-identity-key': bsv.PrivateKey.fromHex(TEST_SERVER_PRIVATE_KEY).publicKey.toString(),
