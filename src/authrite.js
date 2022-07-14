@@ -58,10 +58,10 @@ class Authrite {
    * @param {String} authrite.initialRequestPath Initial request path for establishing a connection
    * @constructor
    */
-  constructor ({
+  constructor (
     clientPrivateKey,
     initialRequestPath = '/authrite/initialRequest'
-  }) {
+  ) {
     // Determine the signing strategy to use
     if (clientPrivateKey) {
       this.signingStrategy = 'ClientPrivateKey'
@@ -87,7 +87,7 @@ class Authrite {
     // Retrieve the client's public identity key for the initial request
     // TODO: verify it gets returned in the correct format (hex?)
     if (!this.clientPublicKey && this.signingStrategy === 'Babbage') {
-      this.clientPublicKey = await BabbageSDK.getPublicKey({ identityKey: true })
+      this.clientPublicKey = (await BabbageSDK.getPublicKey({ identityKey: true })).result
     }
     const serverResponse = await boomerang(
       'POST',
@@ -109,19 +109,14 @@ class Authrite {
       // Construct the message for verification
       const messageToVerify = this.clients[baseUrl].nonce + serverResponse.nonce
       if (this.signingStrategy === 'Babbage') {
-        // Create a signature using the BabbageSDK
-        signature = await BabbageSDK.createSignature({
-          data: Buffer.from(messageToVerify),
-          protocolID: 'authrite message signature', // TODO: include security level
-          keyID: `${this.clients[baseUrl].nonce} ${serverResponse.nonce}`,
-          counterparty: serverResponse.identityKey
-        })
+        signature = Buffer.from(serverResponse.signature, 'hex').toString('base64')
         // Verify the signature created by the SDK
         verified = await BabbageSDK.verifySignature({
           data: Buffer.from(messageToVerify),
-          signature: Buffer.from(signature).toString('base64'),
+          signature,
           protocolID: 'authrite message signature', // TODO: include security level
-          keyID: `${this.clients[baseUrl].nonce} ${serverResponse.nonce}`
+          keyID: `${this.clients[baseUrl].nonce} ${serverResponse.nonce}`,
+          counterparty: serverResponse.identityKey
         })
       } else {
       // 1. Obtain the client's signing public key
@@ -255,15 +250,10 @@ class Authrite {
     const messageToVerify = await response.arrayBuffer()
     // Determine which signing strategy to use
     if (this.signingStrategy === 'Babbage') {
-      signature = await BabbageSDK.createSignature({
-        data: Buffer.from(messageToVerify.data),
-        protocolID: 'authrite message signature',
-        keyID: `${requestNonce} ${response.headers.get('X-Authrite-Nonce')}`,
-        counterparty: this.servers[baseUrl].identityPublicKey
-      })
+      signature = Buffer.from(response.headers.get('x-authrite-signature'), 'hex').toString('base64')
       verified = await BabbageSDK.verifySignature({
         data: Buffer.from(messageToVerify),
-        signature: Buffer.from(signature).toString('base64'),
+        signature,
         protocolID: 'authrite message signature',
         keyID: `${requestNonce} ${response.headers.get('X-Authrite-Nonce')}`,
         counterparty: this.servers[baseUrl].identityPublicKey
