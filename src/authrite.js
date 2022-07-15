@@ -58,17 +58,18 @@ class Authrite {
    * @param {String} authrite.initialRequestPath Initial request path for establishing a connection
    * @constructor
    */
-  constructor (
+  constructor ({
     clientPrivateKey,
-    initialRequestPath = '/authrite/initialRequest'
-  ) {
+    initialRequestPath = '/authrite/initialRequest',
+    signingStrategy = 'Babbage'
+  } = {}) {
     // Determine the signing strategy to use
     if (clientPrivateKey) {
       this.signingStrategy = 'ClientPrivateKey'
       this.clientPrivateKey = clientPrivateKey
       this.clientPublicKey = bsv.PrivateKey.fromHex(clientPrivateKey).publicKey.toString() // TODO: plural or singular clients?
     } else {
-      this.signingStrategy = 'Babbage'
+      this.signingStrategy = signingStrategy
       // The clientPublicKey will be retrieved from the SDK in the inital request
       this.clientPublicKey = null
     }
