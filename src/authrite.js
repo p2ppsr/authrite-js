@@ -101,6 +101,10 @@ class Authrite {
         requestedCertificates: this.servers[baseUrl].requestedCertificates // TODO: provide requested certificates
       }
     )
+    // Check serverResponse for errors
+    if (serverResponse.status === 'error') {
+      throw new Error(`${serverResponse.code} --> ${serverResponse.description} Please check the Authrite baseURL and initial request path config`)
+    }
     if (
       serverResponse.authrite === AUTHRITE_VERSION &&
       serverResponse.messageType === 'initialResponse'
@@ -245,6 +249,11 @@ class Authrite {
         }
       }
     )
+    // Check the server response for errors
+    if (response.status !== 200) {
+      const errorCode = response.status
+      return response.json().then(response => { throw new Error(`${errorCode} ${response.error}`) })
+    }
     // When the server response comes back, validate the signature according to the specification
     let signature, verified
     // Construct the message for verification
