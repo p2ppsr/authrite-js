@@ -1,6 +1,6 @@
 {
   "name": "authrite-js",
-  "version": "0.1.10",
+  "version": "0.1.11",
   "description": "A system for mutual authentication of two parties over a communications channel",
   "main": "src/authrite.js",
   "scripts": {
@@ -19,7 +19,7 @@
   },
   "homepage": "https://github.com/p2ppsr/authrite-js#readme",
   "dependencies": {
-    "@babbage/sdk": "^0.2.4",
+    "@babbage/sdk": "^0.2.5",
     "boomerang-http": "^0.1.0",
     "bsv": "^1.5.6",
     "node-fetch": "^2.6.0",
