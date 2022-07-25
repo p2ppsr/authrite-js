@@ -2,6 +2,8 @@ const boomerang = require('boomerang-http')
 const bsv = require('bsv')
 const crypto = require('crypto')
 const { getPaymentAddress, getPaymentPrivateKey } = require('sendover')
+const BabbageSDK = require('@babbage/sdk')
+
 // The correct versions of URL and fetch should be used
 let fetch, URL
 if (typeof window !== 'undefined') {
@@ -20,13 +22,10 @@ const AUTHRITE_VERSION = '0.1'
 
 /**
    * The client requesting communication with the server
-   * @param {String} privateKey associated with the identityPublicKey
    * @private
    */
 class Client {
-  constructor (privateKey) {
-    this.privateKey = privateKey
-    this.publicKey = bsv.PrivateKey.fromHex(privateKey).publicKey.toString()
+  constructor () {
     this.nonce = crypto.randomBytes(32).toString('base64')
     this.certificates = []
   }
@@ -62,10 +61,27 @@ class Authrite {
    */
   constructor ({
     clientPrivateKey,
-    initialRequestPath = '/authrite/initialRequest'
-  }) {
-    if (!clientPrivateKey || Buffer.byteLength(clientPrivateKey, 'hex') !== 32) throw new Error('Please provide a valid client private key!')
-    this.clientPrivateKey = clientPrivateKey
+    initialRequestPath = '/authrite/initialRequest',
+    signingStrategy = 'Babbage'
+  } = {}) {
+    // Determine the signing strategy to use
+    if (clientPrivateKey) {
+      if (
+        typeof clientPrivateKey === 'string' &&
+        clientPrivateKey.length !== 64
+      ) {
+        throw new Error('Please provide a valid client private key!')
+      }
+      this.signingStrategy = 'ClientPrivateKey'
+      this.clientPrivateKey = clientPrivateKey
+      this.clientPublicKey = bsv.PrivateKey
+        .fromHex(clientPrivateKey)
+        .publicKey.toString()
+    } else {
+      this.signingStrategy = signingStrategy
+      // The clientPublicKey will be retrieved from the SDK in the inital request
+      this.clientPublicKey = null
+    }
     this.initialRequestPath = initialRequestPath
     /*
       Servers and Clients are objects whose keys are base URLs and whose values are instances of the Server or Client class.
@@ -76,40 +92,63 @@ class Authrite {
 
   // Fetch initial server parameters
   async getServerParameters (baseUrl) {
-    this.clients[baseUrl] = new Client(this.clientPrivateKey)
+    this.clients[baseUrl] = new Client()
     this.servers[baseUrl] = new Server(baseUrl, null, null, [], [])
+    // Retrieve the client's public identity key for the initial request
+    if (!this.clientPublicKey && this.signingStrategy === 'Babbage') {
+      this.clientPublicKey = (await BabbageSDK.getPublicKey({
+        identityKey: true
+      })).result
+    }
     const serverResponse = await boomerang(
       'POST',
       baseUrl + this.initialRequestPath,
       {
         authrite: AUTHRITE_VERSION,
         messageType: 'initialRequest',
-        identityKey: this.clients[baseUrl].publicKey,
+        identityKey: this.clientPublicKey,
         nonce: this.clients[baseUrl].nonce,
         requestedCertificates: this.servers[baseUrl].requestedCertificates // TODO: provide requested certificates
       }
     )
+    // Check serverResponse for errors
+    if (serverResponse.status === 'error') {
+      throw new Error(`${serverResponse.code} --> ${serverResponse.description} Please check the Authrite baseURL and initial request path config`)
+    }
     if (
       serverResponse.authrite === AUTHRITE_VERSION &&
       serverResponse.messageType === 'initialResponse'
     ) {
       // Validate server signature
-      // 1. Obtain the public key
-      const signingPublicKey = getPaymentAddress({
-        senderPrivateKey: this.clients[baseUrl].privateKey,
-        recipientPublicKey: serverResponse.identityKey,
-        invoiceNumber: `authrite message signature-${this.clients[baseUrl].nonce} ${serverResponse.nonce}`,
-        returnType: 'publicKey'
-      })
-      // 2. Construct the message for verification
+      let signature, verified
+      // Construct the message for verification
       const messageToVerify = this.clients[baseUrl].nonce + serverResponse.nonce
-      // 3. Verify the signature
-      const signature = bsv.crypto.Signature.fromString(serverResponse.signature)
-      const verified = bsv.crypto.ECDSA.verify(
-        bsv.crypto.Hash.sha256(Buffer.from(messageToVerify)),
-        signature,
-        bsv.PublicKey.fromString(signingPublicKey)
-      )
+      if (this.signingStrategy === 'Babbage') {
+        signature = Buffer.from(serverResponse.signature, 'hex').toString('base64')
+        // Verify the signature created by the SDK
+        verified = await BabbageSDK.verifySignature({
+          data: Buffer.from(messageToVerify),
+          signature,
+          protocolID: [2, 'authrite message signature'],
+          keyID: `${this.clients[baseUrl].nonce} ${serverResponse.nonce}`,
+          counterparty: serverResponse.identityKey
+        })
+      } else {
+      // 1. Obtain the client's signing public key
+        const signingPublicKey = getPaymentAddress({
+          senderPrivateKey: this.clientPrivateKey,
+          recipientPublicKey: serverResponse.identityKey,
+          invoiceNumber: `2-authrite message signature-${this.clients[baseUrl].nonce} ${serverResponse.nonce}`,
+          returnType: 'publicKey'
+        })
+        // 2. Verify the signature
+        signature = bsv.crypto.Signature.fromString(serverResponse.signature)
+        verified = bsv.crypto.ECDSA.verify(
+          bsv.crypto.Hash.sha256(Buffer.from(messageToVerify)),
+          signature,
+          bsv.PublicKey.fromString(signingPublicKey)
+        )
+      }
       // Determine if the signature was verified
       if (verified) {
         this.servers[baseUrl].identityPublicKey = serverResponse.identityKey
@@ -145,16 +184,6 @@ class Authrite {
     ) {
       await this.getServerParameters(baseUrl)
     }
-    // For subsequent requests,
-    // we want to generates a new requestNonce
-    // and use it together with the server’s initialNonce for key derivation
-    const requestNonce = crypto.randomBytes(32).toString('base64')
-    const derivedClientPrivateKey = getPaymentPrivateKey({
-      recipientPrivateKey: this.clients[baseUrl].privateKey,
-      senderPublicKey: this.servers[baseUrl].identityPublicKey,
-      invoiceNumber: 'authrite message signature-' + requestNonce + ' ' + this.servers[baseUrl].nonce,
-      returnType: 'wif'
-    })
     // Make sure the fetchConfig body is formatted to the correct content type
     // TODO: Check fetchConfig.headers['Content-Type'] to support other data types
     if (!fetchConfig.headers) {
@@ -168,8 +197,7 @@ class Authrite {
     }
     if (fetchConfig.method === 'GET' || fetchConfig.method === 'HEAD') {
       dataToSign = requestUrl
-    }
-    else {
+    } else {
       // The fetch API POST request body defaults to '{}'
       if (!fetchConfig.body) {
         fetchConfig.body = '{}'
@@ -185,11 +213,36 @@ class Authrite {
     if (!dataToSign) {
       dataToSign = requestUrl
     }
-    // Create a request signature
-    const requestSignature = bsv.crypto.ECDSA.sign(
-      bsv.crypto.Hash.sha256(Buffer.from(dataToSign)),
-      bsv.PrivateKey.fromWIF(derivedClientPrivateKey)
-    )
+
+    // For subsequent requests,
+    // we want to generates a new requestNonce
+    // and use it together with the server’s initialNonce for key derivation
+    const requestNonce = crypto.randomBytes(32).toString('base64')
+    let requestSignature
+    if (this.signingStrategy === 'Babbage') {
+      requestSignature = await BabbageSDK.createSignature({
+        data: Buffer.from(dataToSign),
+        protocolID: [2, 'authrite message signature'],
+        keyID: `${requestNonce} ${this.servers[baseUrl].nonce}`,
+        counterparty: this.servers[baseUrl].identityPublicKey
+      })
+      // The request signature must be in hex
+      requestSignature = Buffer.from(requestSignature).toString('hex') // TODO: Test the response from createSignature of the SDK
+    } else {
+      const derivedClientPrivateKey = getPaymentPrivateKey({
+        recipientPrivateKey: this.clientPrivateKey,
+        senderPublicKey: this.servers[baseUrl].identityPublicKey,
+        invoiceNumber: `2-authrite message signature-${requestNonce} ${this.servers[baseUrl].nonce}`,
+        returnType: 'wif'
+      })
+      // Create a request signature
+      requestSignature = bsv.crypto.ECDSA.sign(
+        bsv.crypto.Hash.sha256(Buffer.from(dataToSign)),
+        bsv.PrivateKey.fromWIF(derivedClientPrivateKey)
+      )
+      requestSignature = requestSignature.toString()
+    }
+
     // Send the signed Authrite fetch request with the HTTP headers according to the specification
     const response = await fetch(
       requestUrl,
@@ -198,32 +251,46 @@ class Authrite {
         headers: {
           ...fetchConfig.headers,
           'X-Authrite': AUTHRITE_VERSION,
-          'X-Authrite-Identity-Key': this.clients[baseUrl].publicKey,
+          'X-Authrite-Identity-Key': this.clientPublicKey,
           'X-Authrite-Nonce': requestNonce,
           'X-Authrite-YourNonce': this.servers[baseUrl].nonce,
           'X-Authrite-Certificates': this.clients[baseUrl].certificates,
-          'X-Authrite-Signature': requestSignature.toString()
+          'X-Authrite-Signature': requestSignature
         }
       }
     )
     // When the server response comes back, validate the signature according to the specification
-    const signingPublicKey = getPaymentAddress({
-      senderPrivateKey: this.clients[baseUrl].privateKey,
-      recipientPublicKey: this.servers[baseUrl].identityPublicKey,
-      invoiceNumber: 'authrite message signature-' + requestNonce + ' ' + response.headers.get('X-Authrite-Nonce'),
-      returnType: 'publicKey'
-    })
-    // 2. Construct the message for verification
+    let signature, verified
+    // Construct the message for verification
     const messageToVerify = await response.arrayBuffer()
-    // 3. Verify the signature
-    const signature = bsv.crypto.Signature.fromString(
-      response.headers.get('x-authrite-signature')
-    )
-    const verified = bsv.crypto.ECDSA.verify(
-      bsv.crypto.Hash.sha256(Buffer.from(messageToVerify)),
-      signature,
-      bsv.PublicKey.fromString(signingPublicKey)
-    )
+    // Determine which signing strategy to use
+    if (this.signingStrategy === 'Babbage') {
+      signature = Buffer.from(response.headers.get('x-authrite-signature'), 'hex').toString('base64')
+      verified = await BabbageSDK.verifySignature({
+        data: Buffer.from(messageToVerify),
+        signature,
+        protocolID: [2, 'authrite message signature'],
+        keyID: `${requestNonce} ${response.headers.get('X-Authrite-Nonce')}`,
+        counterparty: this.servers[baseUrl].identityPublicKey
+      })
+    } else {
+      // Use the given client's private key as a signing strategy
+      const signingPublicKey = getPaymentAddress({
+        senderPrivateKey: this.clientPrivateKey,
+        recipientPublicKey: this.servers[baseUrl].identityPublicKey,
+        invoiceNumber: '2-authrite message signature-' + requestNonce + ' ' + response.headers.get('X-Authrite-Nonce'),
+        returnType: 'publicKey'
+      })
+      // Create and verify the signature
+      signature = bsv.crypto.Signature.fromString(
+        response.headers.get('x-authrite-signature')
+      )
+      verified = bsv.crypto.ECDSA.verify(
+        bsv.crypto.Hash.sha256(Buffer.from(messageToVerify)),
+        signature,
+        bsv.PublicKey.fromString(signingPublicKey)
+      )
+    }
     if (verified) {
       return {
         status: response.status,

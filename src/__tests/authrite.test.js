@@ -20,7 +20,7 @@ describe('authrite', () => {
       const derivedPrivateKey = sendover.getPaymentPrivateKey({
         recipientPrivateKey: TEST_SERVER_PRIVATE_KEY,
         senderPublicKey: data.identityKey,
-        invoiceNumber: 'authrite message signature-' + data.nonce + ' ' + serverNonce,
+        invoiceNumber: '2-authrite message signature-' + data.nonce + ' ' + serverNonce,
         returnType: 'wif'
       })
       const signature = bsv.crypto.ECDSA.sign(bsv.crypto.Hash.sha256(Buffer.from(message)), bsv.PrivateKey.fromWIF(derivedPrivateKey))
@@ -42,7 +42,7 @@ describe('authrite', () => {
       const derivedPrivateKey = sendover.getPaymentPrivateKey({
         recipientPrivateKey: TEST_SERVER_PRIVATE_KEY,
         senderPublicKey: fetchConfig.headers['X-Authrite-Identity-Key'],
-        invoiceNumber: 'authrite message signature-' + fetchConfig.headers['X-Authrite-Nonce'] + ' ' + serverNonce,
+        invoiceNumber: '2-authrite message signature-' + fetchConfig.headers['X-Authrite-Nonce'] + ' ' + serverNonce,
         returnType: 'wif'
       })
       const responseSignature = bsv.crypto.ECDSA.sign(
@@ -60,6 +60,7 @@ describe('authrite', () => {
       return {
         arrayBuffer: () => Buffer.from(JSON.stringify(message), 'utf8'),
         body: message,
+        json: async () => message,
         status: 200,
         headers: {
           ...headers,
@@ -70,11 +71,6 @@ describe('authrite', () => {
   })
   afterEach(() => {
     jest.clearAllMocks()
-  })
-  it('throws an error if no private key is provided', () => {
-    expect(() => new Authrite({
-      clientPrivateKey: undefined,
-    })).toThrow('Please provide a valid client private key!')
   })
   it('Throws an error if the client private key is not a 256-bit (32 byte) hex value', async () => {
     expect(() => new Authrite({
@@ -88,6 +84,10 @@ describe('authrite', () => {
     const expectedClient = {
       initialRequestPath: '/authrite/initialRequest',
       clientPrivateKey: TEST_CLIENT_PRIVATE_KEY,
+      clientPublicKey: bsv.PrivateKey
+        .fromHex(TEST_CLIENT_PRIVATE_KEY)
+        .publicKey.toString(),
+      signingStrategy: 'ClientPrivateKey',
       clients: {},
       servers: {}
     }
@@ -95,7 +95,6 @@ describe('authrite', () => {
       expectedClient
     )
   })
-  // ---
   it('performs an initial server request', async () => {
     const authrite = new Authrite({
       clientPrivateKey: TEST_CLIENT_PRIVATE_KEY
@@ -107,19 +106,20 @@ describe('authrite', () => {
       {
         authrite: '0.1',
         messageType: 'initialRequest',
-        identityKey: authrite.clients['https://server.com'].publicKey,
+        identityKey: authrite.clientPublicKey,
         nonce: authrite.clients['https://server.com'].nonce,
-        requestedCertificates: [] // TODO: provide requested certificates
-      })
+        requestedCertificates: []
+      }
+    )
     const expectedClient = {
       initialRequestPath: '/authrite/initialRequest',
+      clientPublicKey: '0408c91c1361546c46672cd2c4c7fba7799e785edef509802fd966ad4cce13ad2e038590f44656cf1ae962e21b72039c8579b637c13401317592746db05e443dcd',
       clientPrivateKey: TEST_CLIENT_PRIVATE_KEY,
+      signingStrategy: 'ClientPrivateKey',
       clients: {
         'https://server.com': {
           certificates: [],
-          nonce: expect.any(String),
-          privateKey: '0d7889a0e56684ba795e9b1e28eb906df43454f8172ff3f6807b8cf9464994df',
-          publicKey: '0408c91c1361546c46672cd2c4c7fba7799e785edef509802fd966ad4cce13ad2e038590f44656cf1ae962e21b72039c8579b637c13401317592746db05e443dcd'
+          nonce: expect.any(String)
         }
       },
       servers: {
@@ -159,7 +159,7 @@ describe('authrite', () => {
       const derivedPrivateKey = sendover.getPaymentPrivateKey({
         recipientPrivateKey: TEST_SERVER_PRIVATE_KEY,
         senderPublicKey: fetchConfig.headers['X-Authrite-Identity-Key'],
-        invoiceNumber: 'authrite message signature-' + fetchConfig.headers['X-Authrite-Nonce'] + ' ' + serverNonce,
+        invoiceNumber: '2-authrite message signature-' + fetchConfig.headers['X-Authrite-Nonce'] + ' ' + serverNonce,
         returnType: 'wif'
       })
       const responseSignature = bsv.crypto.ECDSA.sign(
@@ -223,7 +223,7 @@ describe('authrite', () => {
       const derivedPrivateKey = sendover.getPaymentPrivateKey({
         recipientPrivateKey: TEST_SERVER_PRIVATE_KEY,
         senderPublicKey: fetchConfig.headers['X-Authrite-Identity-Key'],
-        invoiceNumber: 'authrite message signature-' + fetchConfig.headers['X-Authrite-Nonce'] + ' ' + serverNonce,
+        invoiceNumber: '2-authrite message signature-' + fetchConfig.headers['X-Authrite-Nonce'] + ' ' + serverNonce,
         returnType: 'wif'
       })
       const responseSignature = bsv.crypto.ECDSA.sign(
@@ -240,6 +240,7 @@ describe('authrite', () => {
       return {
         arrayBuffer: () => Buffer.from(JSON.stringify(responseMessage), 'utf8'),
         body: responseMessage,
+        json: async () => responseMessage,
         headers: {
           ...headers,
           get: jest.fn(x => headers[x.toLowerCase()])
