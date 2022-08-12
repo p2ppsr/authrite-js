@@ -96,9 +96,9 @@ class Authrite {
     this.servers[baseUrl] = new Server(baseUrl, null, null, [], [])
     // Retrieve the client's public identity key for the initial request
     if (!this.clientPublicKey && this.signingStrategy === 'Babbage') {
-      this.clientPublicKey = (await BabbageSDK.getPublicKey({
+      this.clientPublicKey = await BabbageSDK.getPublicKey({
         identityKey: true
-      })).result
+      })
     }
     const serverResponse = await boomerang(
       'POST',
@@ -227,7 +227,7 @@ class Authrite {
         counterparty: this.servers[baseUrl].identityPublicKey
       })
       // The request signature must be in hex
-      requestSignature = Buffer.from(requestSignature).toString('hex') // TODO: Test the response from createSignature of the SDK
+      requestSignature = Buffer.from(requestSignature).toString('hex')
     } else {
       const derivedClientPrivateKey = getPaymentPrivateKey({
         recipientPrivateKey: this.clientPrivateKey,
