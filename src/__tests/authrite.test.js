@@ -1,5 +1,5 @@
 /* eslint-env jest */
-const bsv = require('bsv')
+const bsv = require('babbage-bsv')
 const boomerang = require('boomerang-http')
 const sendover = require('sendover')
 const { Authrite } = require('../authrite')

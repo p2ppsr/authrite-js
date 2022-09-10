@@ -1,5 +1,5 @@
 const boomerang = require('boomerang-http')
-const bsv = require('bsv')
+const bsv = require('babbage-bsv')
 const crypto = require('crypto')
 const { getPaymentAddress, getPaymentPrivateKey } = require('sendover')
 const BabbageSDK = require('@babbage/sdk')
