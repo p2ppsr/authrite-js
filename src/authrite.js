@@ -47,6 +47,7 @@ class Server {
     this.nonce = nonce
     this.certificates = certificates
     this.requestedCertificates = requestedCertificates
+    this.updating = true
   }
 }
 
@@ -113,6 +114,7 @@ class Authrite {
     )
     // Check serverResponse for errors
     if (serverResponse.status === 'error') {
+      this.servers[baseUrl].updating = false
       throw new Error(`${serverResponse.code} --> ${serverResponse.description} Please check the Authrite baseURL and initial request path config`)
     }
     if (
@@ -154,10 +156,13 @@ class Authrite {
         this.servers[baseUrl].identityPublicKey = serverResponse.identityKey
         this.servers[baseUrl].nonce = serverResponse.nonce
         this.servers[baseUrl].requestedCertificates = serverResponse.requestedCertificates // TODO: check certs
+        this.servers[baseUrl].updating = false
       } else {
+        this.servers[baseUrl].updating = false
         throw new Error('Unable to verify server signature!')
       }
     } else {
+      this.servers[baseUrl].updating = false
       throw new Error('Authrite version incompatible')
     }
   }
@@ -177,6 +182,13 @@ class Authrite {
     }
     const baseUrl = `${parsedUrl.protocol}//${parsedUrl.host}`
     // Check for server parameters
+    if (this.servers[baseUrl] && this.servers[baseUrl].updating) {
+      //console.log('Waiting on updating...')
+      while (this.servers[baseUrl].updating) {
+        await new Promise(r => setTimeout(r, 100))
+      }
+      //console.log('...proceeding')
+    }
     if (
       !this.servers[baseUrl] ||
       !this.servers[baseUrl].identityPublicKey ||
