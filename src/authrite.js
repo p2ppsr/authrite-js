@@ -3,6 +3,7 @@ const bsv = require('babbage-bsv')
 const crypto = require('crypto')
 const { getPaymentAddress, getPaymentPrivateKey } = require('sendover')
 const BabbageSDK = require('@babbage/sdk')
+const authriteUtils = require('authrite-utils')
 
 // The correct versions of URL and fetch should be used
 let fetch, URL
@@ -58,12 +59,14 @@ class Authrite {
    * @param {object} authrite All parameters are given in an object.
    * @param {String} authrite.clientPrivateKey The client's private key used for derivations
    * @param {String} authrite.initialRequestPath Initial request path for establishing a connection
+   * @param {Array} authrite.certificates Provided certificates from the client
    * @constructor
    */
   constructor ({
     clientPrivateKey,
     initialRequestPath = '/authrite/initialRequest',
-    signingStrategy = 'Babbage'
+    signingStrategy = 'Babbage',
+    certificates = []
   } = {}) {
     // Determine the signing strategy to use
     if (clientPrivateKey) {
@@ -89,6 +92,13 @@ class Authrite {
     */
     this.servers = {}
     this.clients = {}
+    // Validate provided certificates
+    certificates.forEach(cert => {
+      if (!authriteUtils.verifyCertificateSignature(cert)) {
+        throw new Error('Certificate signature verification failed!') // TODO: Is Authrite compliant with new Babbage Error handling...?
+      }
+    })
+    this.certificates = certificates
   }
 
   // Fetch initial server parameters
@@ -155,7 +165,46 @@ class Authrite {
       if (verified) {
         this.servers[baseUrl].identityPublicKey = serverResponse.identityKey
         this.servers[baseUrl].nonce = serverResponse.nonce
-        this.servers[baseUrl].requestedCertificates = serverResponse.requestedCertificates // TODO: check certs
+
+        // Provide requested certificates.
+        // 1. IF PROVIDED -> calls the getCertificates SDK function with the server-provided RequestedCertificateSet.
+        if (serverResponse.requestedCertificates !== []) {
+          // Check if matching certificates are found
+          const matchingCertificates = await BabbageSDK.getCertificates({
+            certifiers: serverResponse.requestedCertificates.certifiers,
+            types: serverResponse.requestedCertificates.types
+          })
+
+          // IF the getCertificates function returns any certificates
+          // THEN they are added to the this.certificates within the Authrite client.
+          if (matchingCertificates) {
+            // Update certs to contain a keyring property
+            matchingCertificates.map(cert => {
+              cert.keyring = {}
+              return cert
+            })
+            // Check if cert is already added to this.certificates to prevent duplicates
+            // Note: Valid certificates with identical signatures are always identical
+            // Maybe refactor logic... :| --> O(N^2) time complexity
+            let duplicate = false
+            matchingCertificates.forEach(cert => {
+              this.certificates.every(existingCert => {
+                if (existingCert.signature === cert.signature) {
+                  // skip the duplicate cert found!
+                  duplicate = true
+                  return false
+                }
+                return true
+              })
+              if (!duplicate) {
+                this.certificates.push(cert)
+                duplicate = false
+              }
+            })
+          }
+        }
+        this.servers[baseUrl].requestedCertificates = serverResponse.requestedCertificates
+
         this.servers[baseUrl].updating = false
       } else {
         this.servers[baseUrl].updating = false
@@ -183,11 +232,11 @@ class Authrite {
     const baseUrl = `${parsedUrl.protocol}//${parsedUrl.host}`
     // Check for server parameters
     if (this.servers[baseUrl] && this.servers[baseUrl].updating) {
-      //console.log('Waiting on updating...')
+      // console.log('Waiting on updating...')
       while (this.servers[baseUrl].updating) {
         await new Promise(r => setTimeout(r, 100))
       }
-      //console.log('...proceeding')
+      // console.log('...proceeding')
     }
     if (
       !this.servers[baseUrl] ||
