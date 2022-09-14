@@ -186,6 +186,8 @@ class Authrite {
             // Check if cert is already added to this.certificates to prevent duplicates
             // Note: Valid certificates with identical signatures are always identical
             // Maybe refactor logic... :| --> O(N^2) time complexity
+            // Maybe use set
+
             let duplicate = false
             matchingCertificates.forEach(cert => {
               this.certificates.every(existingCert => {
@@ -303,6 +305,38 @@ class Authrite {
       )
       requestSignature = requestSignature.toString()
     }
+
+    // TODO: Provide necessary certificates
+    // a list of certificates with acceptable type and certifier values for the request, based on what the server requested.
+
+    const certSignatures = this.servers[baseUrl].requestedCertificates.map(cert => cert.signature)
+    const certificatesToInclude = this.certificates.filter(cert => certSignatures.contains(cert.signature))
+
+    // TODO:
+    certificatesToInclude.forEach(cert => {
+      // Check if a keyring exists for this server.
+      // IF an existing keyring has been found for this certificate associated with the verifier
+      if (cert.keyring) {
+        // THEN the client compares the list of fields from the keyring with the list of fields this server is requesting for this certificate type.
+        Object.keys(cert.fields)
+        // IF there are any differences between the list of fields requested by the server, and those present in the current keyring
+        // THEN the SDK proveCertificate function is called, generating a new keyring for this verifier containing only the verifier’s requested fields. The updated keyrings entry is saved.
+        // Where is the keyring stored?
+        // const newKeyring = BabbageSDK.proveCertificate() ?
+        // this.servers[baseUrl].requestedCertificates.find() ?
+      }
+    })
+
+    // Different way to filter
+    // const certificatesToInclude = []
+    // this.servers[baseUrl].requestedCertificates.forEach(cert => {
+    //   this.certificates.forEach(existingCert => {
+    //     if (existingCert.signature === cert.signature) {
+    //       // TODO THEN the client checks if the certificate has a keyrings entry for this server.
+    //       certificatesToInclude.push(existingCert)
+    //     }
+    //   })
+    // })
 
     // Send the signed Authrite fetch request with the HTTP headers according to the specification
     const response = await fetch(
