@@ -3,6 +3,7 @@ const bsv = require('babbage-bsv')
 const crypto = require('crypto')
 const { getPaymentAddress, getPaymentPrivateKey } = require('sendover')
 const BabbageSDK = require('@babbage/sdk')
+const authriteUtils = require('authrite-utils')
 
 // The correct versions of URL and fetch should be used
 let fetch, URL
@@ -27,7 +28,6 @@ const AUTHRITE_VERSION = '0.1'
 class Client {
   constructor () {
     this.nonce = crypto.randomBytes(32).toString('base64')
-    this.certificates = []
   }
 }
 
@@ -58,12 +58,14 @@ class Authrite {
    * @param {object} authrite All parameters are given in an object.
    * @param {String} authrite.clientPrivateKey The client's private key used for derivations
    * @param {String} authrite.initialRequestPath Initial request path for establishing a connection
+   * @param {Array} authrite.certificates Provided certificates from the client
    * @constructor
    */
   constructor ({
     clientPrivateKey,
     initialRequestPath = '/authrite/initialRequest',
-    signingStrategy = 'Babbage'
+    signingStrategy = 'Babbage',
+    certificates = []
   } = {}) {
     // Determine the signing strategy to use
     if (clientPrivateKey) {
@@ -71,7 +73,9 @@ class Authrite {
         typeof clientPrivateKey === 'string' &&
         clientPrivateKey.length !== 64
       ) {
-        throw new Error('Please provide a valid client private key!')
+        const e = new Error('Please provide a valid client private key!')
+        e.code = 'ERR_INVALID_CLIENT_PRIVATE_KEY'
+        throw e
       }
       this.signingStrategy = 'ClientPrivateKey'
       this.clientPrivateKey = clientPrivateKey
@@ -89,6 +93,18 @@ class Authrite {
     */
     this.servers = {}
     this.clients = {}
+    // Validate provided certificates
+    certificates.forEach(cert => {
+      if (!authriteUtils.verifyCertificateSignature(cert)) {
+        const e = new Error('Certificate signature verification failed!')
+        e.code = 'ERR_CERT_SIG_VERIFICATION_FAILED'
+        throw e
+      }
+      if (typeof cert.keyrings !== 'object') {
+        cert.keyrings = {}
+      }
+    })
+    this.certificates = certificates
   }
 
   // Fetch initial server parameters
@@ -115,7 +131,9 @@ class Authrite {
     // Check serverResponse for errors
     if (serverResponse.status === 'error') {
       this.servers[baseUrl].updating = false
-      throw new Error(`${serverResponse.code} --> ${serverResponse.description} Please check the Authrite baseURL and initial request path config`)
+      const e = new Error(`${serverResponse.code} --> ${serverResponse.description} Please check the Authrite baseURL and initial request path config`)
+      e.code = 'ERR_INVALID_SERVER_REQUEST'
+      throw e
     }
     if (
       serverResponse.authrite === AUTHRITE_VERSION &&
@@ -155,15 +173,55 @@ class Authrite {
       if (verified) {
         this.servers[baseUrl].identityPublicKey = serverResponse.identityKey
         this.servers[baseUrl].nonce = serverResponse.nonce
-        this.servers[baseUrl].requestedCertificates = serverResponse.requestedCertificates // TODO: check certs
+
+        // Check certificates were requested, and that the client is using Babbage as the signing strategy
+        if (serverResponse.requestedCertificates.certifiers.length !== 0 && this.signingStrategy === 'Babbage') {
+          // Find matching certificates
+          const matchingCertificates = await BabbageSDK.getCertificates({
+            certifiers: serverResponse.requestedCertificates.certifiers,
+            types: serverResponse.requestedCertificates.types
+          })
+
+          // IF the getCertificates function returns any certificates
+          // THEN they are added to the this.certificates within the Authrite client.
+          if (matchingCertificates.length !== 0) {
+            // Update certs to contain a keyring property
+            matchingCertificates.map(cert => {
+              cert.keyrings = {}
+              return cert
+            })
+            // Check if cert is already added to this.certificates to prevent duplicates
+            // Note: Valid certificates with identical signatures are always identical
+            let duplicate = false
+            matchingCertificates.forEach(cert => {
+              this.certificates.every(existingCert => {
+                if (existingCert.signature === cert.signature) {
+                  // skip the duplicate cert found!
+                  duplicate = true
+                  return false
+                }
+                return true
+              })
+              if (!duplicate) {
+                this.certificates.push(cert)
+                duplicate = false
+              }
+            })
+          }
+        }
+        this.servers[baseUrl].requestedCertificates = serverResponse.requestedCertificates
         this.servers[baseUrl].updating = false
       } else {
         this.servers[baseUrl].updating = false
-        throw new Error('Unable to verify server signature!')
+        const e = new Error('Unable to verify server signature!')
+        e.code = 'ERR_INVALID_SIGNATURE'
+        throw e
       }
     } else {
       this.servers[baseUrl].updating = false
-      throw new Error('Authrite version incompatible')
+      const e = new Error('Authrite version incompatible')
+      e.code = 'ERR_INVALID_AUTHRITE_VERSION'
+      throw e
     }
   }
 
@@ -178,16 +236,16 @@ class Authrite {
     // Extract baseUrl from URL
     const parsedUrl = new URL(requestUrl)
     if (!parsedUrl.host) {
-      throw new Error('Invalid request URL!')
+      const e = new Error('Invalid request URL!')
+      e.code = 'ERR_INVALID_URL'
+      throw e
     }
     const baseUrl = `${parsedUrl.protocol}//${parsedUrl.host}`
     // Check for server parameters
     if (this.servers[baseUrl] && this.servers[baseUrl].updating) {
-      //console.log('Waiting on updating...')
       while (this.servers[baseUrl].updating) {
-        await new Promise(r => setTimeout(r, 100))
+        await new Promise(resolve => setTimeout(resolve, 100))
       }
-      //console.log('...proceeding')
     }
     if (
       !this.servers[baseUrl] ||
@@ -255,6 +313,39 @@ class Authrite {
       requestSignature = requestSignature.toString()
     }
 
+    // Provide a list of certificates with acceptable type and certifier values for the request, based on what the server requested.
+    const requestedCerts = this.servers[baseUrl].requestedCertificates
+    const certificatesToInclude = this.certificates.filter(cert =>
+      requestedCerts.certifiers.contains(cert.certifier) &&
+      Object.keys(requestedCerts.types).contains(cert.type)
+    )
+
+    await Promise.all(certificatesToInclude.map(async cert => {
+      // Check if a keyring exists for this server/verifier.
+      const verifierKeyring = cert.keyrings[this.servers[baseUrl].identityPublicKey]
+      const requestedFields = this.servers[baseUrl].requestedCertificates.types[cert.type]
+
+      // IF an existing keyring has been found, compare the list of fields from the keyring with the list of fields this server is requesting for this certificate type.
+      // TODO: Consider refactoring array comparison.
+      if (!verifierKeyring || JSON.stringify(Object.keys(verifierKeyring)) !== JSON.stringify(requestedFields)) {
+        // If there are differences, or no keyring, SDK proveCertificate function generates a new keyring for this verifier containing only the verifier’s requested fields.
+        // Ensure Babbage signing strategy is used
+        if (this.signingStrategy !== 'Babbage') {
+          const e = new Error('No valid keyring, or method for obtaining keyring, for this certificate and verifier!')
+          e.code = 'ERR_NO_CERT_PROOF_STRATEGY'
+          throw e
+        }
+        const { keyring } = await BabbageSDK.proveCertificate({
+          certificate: cert,
+          fieldsToReveal: requestedFields,
+          verifierPublicIdentityKey: this.servers[baseUrl].identityPublicKey
+        })
+        // Save the keyring for this verifier
+        cert.keyrings[this.servers[baseUrl].identityPublicKey] = keyring
+      }
+      cert.keyring = cert.keyrings[this.servers[baseUrl].identityPublicKey]
+    }))
+
     // Send the signed Authrite fetch request with the HTTP headers according to the specification
     const response = await fetch(
       requestUrl,
@@ -266,7 +357,7 @@ class Authrite {
           'X-Authrite-Identity-Key': this.clientPublicKey,
           'X-Authrite-Nonce': requestNonce,
           'X-Authrite-YourNonce': this.servers[baseUrl].nonce,
-          'X-Authrite-Certificates': this.clients[baseUrl].certificates,
+          'X-Authrite-Certificates': certificatesToInclude,
           'X-Authrite-Signature': requestSignature
         }
       }
@@ -310,7 +401,9 @@ class Authrite {
         body: messageToVerify
       }
     } else {
-      throw new Error('Unable to verify Authrite server response signature!')
+      const e = new Error('Unable to verify Authrite server response signature!')
+      e.code = 'ERR_INVALID_SIGNATURE'
+      throw e
     }
   }
 }
