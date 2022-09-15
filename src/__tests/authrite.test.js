@@ -74,12 +74,12 @@ describe('authrite', () => {
   })
   it('Throws an error if the client private key is not a 256-bit (32 byte) hex value', async () => {
     expect(() => new Authrite({
-      clientPrivateKey: TEST_CLIENT_PRIVATE_KEY + TEST_CLIENT_PRIVATE_KEY,
+      clientPrivateKey: TEST_CLIENT_PRIVATE_KEY + TEST_CLIENT_PRIVATE_KEY
     })).toThrow('Please provide a valid client private key!')
   }, 100000)
   it('populates a new authrite instance', () => {
     const authrite = new Authrite({
-      clientPrivateKey: TEST_CLIENT_PRIVATE_KEY,
+      clientPrivateKey: TEST_CLIENT_PRIVATE_KEY
     })
     const expectedClient = {
       initialRequestPath: '/authrite/initialRequest',
@@ -138,7 +138,7 @@ describe('authrite', () => {
   })
   it('sends a valid signed request with empty body to the server', async () => {
     const authrite = new Authrite({
-      clientPrivateKey: TEST_CLIENT_PRIVATE_KEY,
+      clientPrivateKey: TEST_CLIENT_PRIVATE_KEY
     })
 
     // Save the client's headers so we can verify the fetch request for testing
