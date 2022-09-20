@@ -355,7 +355,7 @@ class Authrite {
           'X-Authrite-Identity-Key': this.clientPublicKey,
           'X-Authrite-Nonce': requestNonce,
           'X-Authrite-YourNonce': this.servers[baseUrl].nonce,
-          'X-Authrite-Certificates': certificatesToInclude,
+          'X-Authrite-Certificates': JSON.stringify(certificatesToInclude),
           'X-Authrite-Signature': requestSignature
         }
       }
