@@ -314,7 +314,7 @@ class Authrite {
     // Provide a list of certificates with acceptable type and certifier values for the request, based on what the server requested.
     const requestedCerts = this.servers[baseUrl].requestedCertificates
     const certificatesToInclude = this.certificates.filter(cert =>
-      requestedCerts.certifiers.inclues(cert.certifier) &&
+      requestedCerts.certifiers.includes(cert.certifier) &&
       Object.keys(requestedCerts.types).includes(cert.type)
     )
 
