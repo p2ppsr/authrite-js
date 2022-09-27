@@ -334,7 +334,16 @@ class Authrite {
           throw e
         }
         const { keyring } = await BabbageSDK.proveCertificate({
-          certificate: cert,
+          certificate: {
+            fields: cert.fields,
+            serialNumber: cert.serialNumber,
+            validationKey: cert.validationKey,
+            certifier: cert.certifier,
+            subject: cert.subject,
+            type: cert.type,
+            revocationOutpoint: cert.revocationOutpoint,
+            signature: cert.signature
+          },
           fieldsToReveal: requestedFields,
           verifierPublicIdentityKey: this.servers[baseUrl].identityPublicKey
         })
