@@ -314,8 +314,8 @@ class Authrite {
     // Provide a list of certificates with acceptable type and certifier values for the request, based on what the server requested.
     const requestedCerts = this.servers[baseUrl].requestedCertificates
     const certificatesToInclude = this.certificates.filter(cert =>
-      requestedCerts.certifiers.contains(cert.certifier) &&
-      Object.keys(requestedCerts.types).contains(cert.type)
+      requestedCerts.certifiers.inclues(cert.certifier) &&
+      Object.keys(requestedCerts.types).includes(cert.type)
     )
 
     await Promise.all(certificatesToInclude.map(async cert => {
