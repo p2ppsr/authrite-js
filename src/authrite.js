@@ -313,7 +313,7 @@ class Authrite {
 
     // Provide a list of certificates with acceptable type and certifier values for the request, based on what the server requested.
     const requestedCerts = this.servers[baseUrl].requestedCertificates
-    const certificatesToInclude = this.certificates.filter(cert =>
+    let certificatesToInclude = this.certificates.filter(cert =>
       requestedCerts.certifiers.includes(cert.certifier) &&
       Object.keys(requestedCerts.types).includes(cert.type)
     )
@@ -325,7 +325,11 @@ class Authrite {
 
       // IF an existing keyring has been found, compare the list of fields from the keyring with the list of fields this server is requesting for this certificate type.
       // TODO: Consider refactoring array comparison.
-      if (!verifierKeyring || JSON.stringify(Object.keys(verifierKeyring)) !== JSON.stringify(requestedFields)) {
+      if (
+        !verifierKeyring ||
+        JSON.stringify(Object.keys(verifierKeyring)) !==
+        JSON.stringify(requestedFields)
+      ) {
         // If there are differences, or no keyring, SDK proveCertificate function generates a new keyring for this verifier containing only the verifier’s requested fields.
         // Ensure Babbage signing strategy is used
         if (this.signingStrategy !== 'Babbage') {
@@ -351,6 +355,19 @@ class Authrite {
         cert.keyrings[this.servers[baseUrl].identityPublicKey] = keyring
       }
       cert.keyring = cert.keyrings[this.servers[baseUrl].identityPublicKey]
+    }))
+
+    // Remove all extra from the certificates
+    certificatesToInclude = certificatesToInclude.map(cert => ({
+      fields: cert.fields,
+      serialNumber: cert.serialNumber,
+      validationKey: cert.validationKey,
+      certifier: cert.certifier,
+      subject: cert.subject,
+      type: cert.type,
+      revocationOutpoint: cert.revocationOutpoint,
+      signature: cert.signature,
+      keyring: cert.keyring
     }))
 
     // Send the signed Authrite fetch request with the HTTP headers according to the specification
