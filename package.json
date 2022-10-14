@@ -20,7 +20,7 @@
   },
   "homepage": "https://github.com/p2ppsr/authrite-js#readme",
   "dependencies": {
-    "@babbage/sdk": "^0.4.2",
+    "@babbage/sdk": "^0.4.5",
     "authrite-utils": "^0.1.4",
     "babbage-bsv": "^0.1.0",
     "boomerang-http": "^0.1.0",
@@ -28,7 +28,7 @@
     "sendover": "^1.1.5"
   },
   "devDependencies": {
-    "documentation": "^13.2.5",
+    "documentation": "^14.0.0",
     "fetch-mock": "^9.11.0",
     "jest": "^28.0.3",
     "standard": "^17.0.0"

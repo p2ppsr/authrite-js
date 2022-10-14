@@ -69,10 +69,12 @@ Client-side API for establishing authenticated server communication
 
 #### Parameters
 
-*   `authrite` **[object](https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Object)** All parameters are given in an object.
+*   `authrite` **[object](https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Object)** All parameters are given in an object. (optional, default `{}`)
 
     *   `authrite.clientPrivateKey` **[String](https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/String)** The client's private key used for derivations
     *   `authrite.initialRequestPath` **[String](https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/String)** Initial request path for establishing a connection (optional, default `'/authrite/initialRequest'`)
+    *   `authrite.certificates` **[Array](https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Array)** Provided certificates from the client (optional, default `[]`)
+    *   `authrite.signingStrategy`   (optional, default `'Babbage'`)
 
 ### request
 
