@@ -23,7 +23,7 @@ This example demonstrates sending a simple request sent with **authrite-js**
 const { Authrite } = require('authrite-js')
 
 // Authrite required parameters
-const EXAMPLE_CLIENT_PRIVATE_KEY = 
+const TEST_CLIENT_PRIVATE_KEY = 
 '0d7889a0e56684ba795e9b1e28eb906df43454f8172ff3f6807b8cf9464994df'
 
 const init = async () => {
