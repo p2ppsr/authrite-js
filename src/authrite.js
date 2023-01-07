@@ -431,6 +431,19 @@ class Authrite {
       body: messageToVerify
     }
   }
+
+  /**
+   * @public
+   * Adds a newly created certificate to the cache
+   * @param {object} certificate Certificate produced by createCertificate to be added to the cache.
+   */
+  async addCertificate (certificate) {
+    if (!this.certificates.every(c => c.signature !== certificate.signature))
+      // Don't add if duplicate
+      return
+
+    this.certificates.push({...certificate, keyrings: {}})
+  }
 }
 
 module.exports = { Authrite }
