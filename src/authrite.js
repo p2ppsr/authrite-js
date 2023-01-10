@@ -448,5 +448,5 @@ class Authrite {
 
 module.exports = {
   Authrite,
-  utils
+  utils: authriteUtils
 }
