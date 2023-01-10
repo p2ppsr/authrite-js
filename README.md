@@ -62,6 +62,8 @@ init()
     *   [Parameters](#parameters)
 *   [request](#request)
     *   [Parameters](#parameters-1)
+*   [addCertificate](#addcertificate)
+    *   [Parameters](#parameters-2)
 
 ### constructor
 
@@ -84,6 +86,12 @@ Client-side API for establishing authenticated server communication
 *   `fetchConfig` **[object](https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Object)** Config object passed to the [Fetch API](https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API). The current version of Authrite only supports JSON structures for the fetch body. However, you can include a [Buffer](https://nodejs.org/api/buffer.html) as part of the json object. (optional, default `{}`)
 
 Returns **[object](https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Object)** The response object. Fields are 'status', 'headers' and 'body' (containing an ArrayBuffer of the HTTP response body)
+
+### addCertificate
+
+#### Parameters
+
+*   `certificate` **[object](https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Object)** Certificate produced by createCertificate to be added to the cache.
 
 ## License
 
