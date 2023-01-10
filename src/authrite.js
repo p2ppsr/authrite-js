@@ -446,4 +446,7 @@ class Authrite {
   }
 }
 
-module.exports = { Authrite }
+module.exports = {
+  Authrite,
+  utils
+}
