@@ -185,7 +185,7 @@ class Authrite {
     this.servers[baseUrl].nonce = serverResponse.nonce
 
     // Check certificates were requested, and that the client is using Babbage as the signing strategy
-    if (serverResponse.requestedCertificates.certifiers.length !== 0 && this.signingStrategy === 'Babbage') {
+    if (serverResponse.requestedCertificates.certifiers && serverResponse.requestedCertificates.certifiers.length !== 0 && this.signingStrategy === 'Babbage') {
       // Find matching certificates
       let matchingCertificates = await BabbageSDK.getCertificates({
         certifiers: serverResponse.requestedCertificates.certifiers,
