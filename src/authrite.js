@@ -3,7 +3,7 @@ const bsv = require('babbage-bsv')
 const crypto = require('crypto')
 const { getPaymentAddress, getPaymentPrivateKey } = require('sendover')
 const BabbageSDK = require('@babbage/sdk')
-const authriteUtils = require('authrite-utils')
+const { verifyCertificateSignature } = require('authrite-utils')
 
 // The correct versions of URL and fetch should be used
 let fetch, URL
@@ -95,7 +95,7 @@ class Authrite {
     this.clients = {}
     // Validate provided certificates
     certificates.forEach(cert => {
-      if (!authriteUtils.verifyCertificateSignature(cert)) {
+      if (!verifyCertificateSignature(cert)) {
         const e = new Error('Certificate signature verification failed!')
         e.code = 'ERR_CERT_SIG_VERIFICATION_FAILED'
         throw e
@@ -438,15 +438,13 @@ class Authrite {
    * @param {object} certificate Certificate produced by createCertificate to be added to the cache.
    */
   async addCertificate (certificate) {
-    if (!this.certificates.every(c => c.signature !== certificate.signature))
-      // Don't add if duplicate
+    // Don't add if duplicate
+    if (!this.certificates.every(c => c.signature !== certificate.signature)) {
       return
+    }
 
-    this.certificates.push({...certificate, keyrings: {}})
+    this.certificates.push({ ...certificate, keyrings: {} })
   }
 }
 
-module.exports = {
-  Authrite,
-  utils: authriteUtils
-}
+module.exports = { Authrite }
