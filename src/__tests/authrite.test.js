@@ -89,7 +89,8 @@ describe('authrite', () => {
         .publicKey.toString(),
       signingStrategy: 'ClientPrivateKey',
       clients: {},
-      servers: {}
+      servers: {},
+      certificates: []
     }
     expect(JSON.parse(JSON.stringify(authrite))).toEqual(
       expectedClient
@@ -112,13 +113,13 @@ describe('authrite', () => {
       }
     )
     const expectedClient = {
+      certificates: [],
       initialRequestPath: '/authrite/initialRequest',
-      clientPublicKey: '0408c91c1361546c46672cd2c4c7fba7799e785edef509802fd966ad4cce13ad2e038590f44656cf1ae962e21b72039c8579b637c13401317592746db05e443dcd',
+      clientPublicKey: '0308c91c1361546c46672cd2c4c7fba7799e785edef509802fd966ad4cce13ad2e',
       clientPrivateKey: TEST_CLIENT_PRIVATE_KEY,
       signingStrategy: 'ClientPrivateKey',
       clients: {
         'https://server.com': {
-          certificates: [],
           nonce: expect.any(String)
         }
       },
@@ -126,9 +127,10 @@ describe('authrite', () => {
         'https://server.com': {
           baseUrl: 'https://server.com',
           certificates: [],
-          identityPublicKey: '04b51d497f8c67c1416cfe1a58daa5a576a63eb0b64608922d5c4f98b6a1d9b103f9c42cd08b1376ec1932be02c7debdc5314fa563d383d61f8110a5df910bc719',
+          identityPublicKey: '03b51d497f8c67c1416cfe1a58daa5a576a63eb0b64608922d5c4f98b6a1d9b103',
           nonce: expect.any(String),
-          requestedCertificates: []
+          requestedCertificates: [],
+          updating: false
         }
       }
     }
@@ -193,7 +195,7 @@ describe('authrite', () => {
           'X-Authrite-Identity-Key': clientIdentityKey,
           'X-Authrite-Nonce': clientNonce,
           'X-Authrite-YourNonce': expect.any(String),
-          'X-Authrite-Certificates': [],
+          'X-Authrite-Certificates': JSON.stringify([]),
           'X-Authrite-Signature': clientSig
         }
       }
@@ -268,7 +270,7 @@ describe('authrite', () => {
           'X-Authrite-Identity-Key': clientIdentityKey,
           'X-Authrite-Nonce': clientNonce,
           'X-Authrite-YourNonce': expect.any(String),
-          'X-Authrite-Certificates': [],
+          'X-Authrite-Certificates': JSON.stringify([]),
           'X-Authrite-Signature': clientSig,
           'Content-Type': 'application/json'
         }
