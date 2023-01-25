@@ -1,5 +1,5 @@
 const sdk = require('@babbage/sdk')
-const { Authrite } = require('authrite-js')
+const { Authrite } = require('./authrite')
 
 class AuthriteClient {
   /**
