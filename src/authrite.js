@@ -428,7 +428,10 @@ class Authrite {
     return {
       status: response.status,
       headers: response.headers,
-      body: messageToVerify
+      body: messageToVerify,
+      json: async () => {
+        return JSON.parse(Buffer.from(messageToVerify).toString('utf8'))
+      }
     }
   }
 
