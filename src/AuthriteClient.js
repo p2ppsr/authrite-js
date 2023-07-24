@@ -12,18 +12,23 @@ class AuthriteClient {
    * Shares a common Authrite instance to allow caching for certificates.
    * 
    * @param {String} serverUrl The baseUrl of the Server to which multiple Authrite requests are being made.
+   * @param {object} authriteParams Optional constructor parameters for singleton Authrite instance.
+   * @param {String} configId Optional shared instance identifier. One singleton is shared across all uses of same configId.
    * @returns {object} The new object. Fields are 'authrite' (shared Authrite instance) and 'serverURL' (constructor argument)
    * @constructor
    */
-    constructor(serverURL) {
+    constructor(serverURL, authriteParams = {}, configId = 'default') {
         // Authrite caches certificates for multiple clients.
         // For performance, there should be only one.
-        if (!AuthriteClient.Authrite) {
-            AuthriteClient.Authrite = new Authrite()
+        if (!AuthriteClient.Authrite) AuthriteClient.Authrite = {}
+        if (!AuthriteClient.Authrite[configId]) {
+            AuthriteClient.Authrite[configId] = new Authrite(authriteParams)
         }
 
-        this.authrite = AuthriteClient.Authrite
+        this.authrite = AuthriteClient.Authrite[configId]
         this.serverURL = serverURL
+        this.authriteParams = authriteParams
+        this.configId = configId
     }
 
   /**
