@@ -298,12 +298,12 @@ class Authrite {
         ...fetchConfig,
         headers: {
           ...fetchConfig.headers,
-          'X-Authrite': AUTHRITE_VERSION,
-          'X-Authrite-Identity-Key': this.clientPublicKey,
-          'X-Authrite-Nonce': requestNonce,
-          'X-Authrite-YourNonce': this.servers[baseUrl].nonce,
-          'X-Authrite-Certificates': JSON.stringify(certificatesToInclude),
-          'X-Authrite-Signature': requestSignature
+          'x-authrite': AUTHRITE_VERSION,
+          'x-authrite-identity-key': this.clientPublicKey,
+          'x-authrite-nonce': requestNonce,
+          'x-authrite-yournonce': this.servers[baseUrl].nonce,
+          'x-authrite-certificates': JSON.stringify(certificatesToInclude),
+          'x-authrite-signature': requestSignature
         }
       }
     )
