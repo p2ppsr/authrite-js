@@ -4,6 +4,8 @@ const crypto = require('crypto')
 const { getPaymentAddress, getPaymentPrivateKey } = require('sendover')
 const BabbageSDK = require('@babbage/sdk')
 const { verifyCertificateSignature } = require('authrite-utils')
+const io = require('socket.io-client')
+const verifyServerSignature = require('./utils/verifyServerSignature')
 
 // The correct versions of URL and fetch should be used
 let fetch, URL
@@ -128,99 +130,14 @@ class Authrite {
         requestedCertificates: this.servers[baseUrl].requestedCertificates // TODO: provide requested certificates
       }
     )
-    // Check serverResponse for errors
-    if (serverResponse.status === 'error') {
-      this.servers[baseUrl].updating = false
-      const e = new Error(`${serverResponse.code} --> ${serverResponse.description} Please check the Authrite baseURL and initial request path config`)
-      e.code = 'ERR_INVALID_SERVER_REQUEST'
-      throw e
-    }
-    if (
-      serverResponse.authrite !== AUTHRITE_VERSION ||
-      serverResponse.messageType !== 'initialResponse'
-    ) {
-      this.servers[baseUrl].updating = false
-      const e = new Error('Authrite version incompatible')
-      e.code = 'ERR_INVALID_AUTHRITE_VERSION'
-      throw e
-    }
-    // Validate server signature
-    let signature, verified
-    // Construct the message for verification
-    const messageToVerify = this.clients[baseUrl].nonce + serverResponse.nonce
-    if (this.signingStrategy === 'Babbage') {
-      signature = Buffer.from(serverResponse.signature, 'hex').toString('base64')
-      // Verify the signature created by the SDK
-      verified = await BabbageSDK.verifySignature({
-        data: Buffer.from(messageToVerify),
-        signature,
-        protocolID: [2, 'authrite message signature'],
-        keyID: `${this.clients[baseUrl].nonce} ${serverResponse.nonce}`,
-        counterparty: serverResponse.identityKey
-      })
-    } else {
-    // 1. Obtain the client's signing public key
-      const signingPublicKey = getPaymentAddress({
-        senderPrivateKey: this.clientPrivateKey,
-        recipientPublicKey: serverResponse.identityKey,
-        invoiceNumber: `2-authrite message signature-${this.clients[baseUrl].nonce} ${serverResponse.nonce}`,
-        returnType: 'publicKey'
-      })
-      // 2. Verify the signature
-      signature = bsv.crypto.Signature.fromString(serverResponse.signature)
-      verified = bsv.crypto.ECDSA.verify(
-        bsv.crypto.Hash.sha256(Buffer.from(messageToVerify)),
-        signature,
-        bsv.PublicKey.fromString(signingPublicKey)
-      )
-    }
-    // Determine if the signature was verified
-    if (!verified) {
-      this.servers[baseUrl].updating = false
-      const e = new Error('Unable to verify server signature!')
-      e.code = 'ERR_INVALID_SIGNATURE'
-      throw e
-    }
-    this.servers[baseUrl].identityPublicKey = serverResponse.identityKey
-    this.servers[baseUrl].nonce = serverResponse.nonce
-
-    // Check certificates were requested, and that the client is using Babbage as the signing strategy
-    if (serverResponse.requestedCertificates.certifiers && serverResponse.requestedCertificates.certifiers.length !== 0 && this.signingStrategy === 'Babbage') {
-      // Find matching certificates
-      let matchingCertificates = await BabbageSDK.getCertificates({
-        certifiers: serverResponse.requestedCertificates.certifiers,
-        types: serverResponse.requestedCertificates.types
-      })
-
-      // IF the getCertificates function returns any certificates
-      // THEN they are added to the this.certificates within the Authrite client.
-      if (matchingCertificates.length !== 0) {
-        // Update certs to contain a keyring property
-        matchingCertificates = matchingCertificates.map(cert => {
-          cert.keyrings = {}
-          return cert
-        })
-        // Check if cert is already added to this.certificates to prevent duplicates
-        // Note: Valid certificates with identical signatures are always identical
-        matchingCertificates.forEach(cert => {
-          let duplicate = false
-          this.certificates.every(existingCert => {
-            if (existingCert.signature === cert.signature) {
-              // skip the duplicate cert found!
-              duplicate = true
-              return false
-            }
-            return true
-          })
-          if (!duplicate) {
-            this.certificates.push(cert)
-            duplicate = false
-          }
-        })
-      }
-    }
-    this.servers[baseUrl].requestedCertificates = serverResponse.requestedCertificates
-    this.servers[baseUrl].updating = false
+    // Note: are clients and servers passed by references or copy?
+    await verifyServerSignature(
+      AUTHRITE_VERSION,
+      baseUrl,
+      this.clients,
+      this.servers,
+      serverResponse
+    )
   }
 
   /**
@@ -436,6 +353,73 @@ class Authrite {
   }
 
   /**
+   * Support setting a socket connection
+   * @param {*} connectionUrl
+   * @param {*} config
+   */
+  async socket (connectionUrl, config = {}) {
+    this.clients[connectionUrl] = new Client()
+    this.servers[connectionUrl] = new Server(connectionUrl, null, null, [], [])
+    // Retrieve the client's public identity key for the initial request
+    if (!this.clientPublicKey && this.signingStrategy === 'Babbage') {
+      this.clientPublicKey = await BabbageSDK.getPublicKey({
+        identityKey: true
+      })
+    }
+
+    // Note: are clients and servers passed by references or copy?
+
+    this.socket = io.connect(connectionUrl, {
+      extraHeaders: {
+        authrite: AUTHRITE_VERSION,
+        messageType: 'initialRequest',
+        identityKey: this.clientPublicKey,
+        nonce: this.clients[connectionUrl].nonce,
+        requestedCertificates: this.servers[connectionUrl].requestedCertificates // TODO: provide requested certificates
+      }
+    })
+    this.socket.on('validationResponse', async (data) => {
+      console.log('Server says:', data)
+      this.serverPublicKey = data.serverPublicKey
+
+      await verifyServerSignature(
+        AUTHRITE_VERSION,
+        connectionUrl,
+        this.signingStrategy,
+        this.clientPrivateKey,
+        this.clients,
+        this.servers,
+        data,
+        this.certificates
+      )
+    })
+  }
+
+  async emit (event, data) {
+    const requestNonce = crypto.randomBytes(32).toString('base64')
+    const baseUrl = 'http://localhost:4000'
+
+    let requestSignature = await BabbageSDK.createSignature({
+      data: Buffer.from('test'),
+      protocolID: [2, 'authrite message signature'],
+      keyID: `${requestNonce} ${this.servers[baseUrl].nonce}`,
+      counterparty: this.servers[baseUrl].identityPublicKey
+    })
+    // The request signature must be in hex
+    requestSignature = Buffer.from(requestSignature).toString('hex')
+
+    this.socket.emit(event, {
+      data,
+      headers: {
+        'x-authrite-identity-key': this.clientPublicKey,
+        'x-authrite-nonce': requestNonce,
+        'x-authrite-yournonce': this.servers[baseUrl].nonce, // TODO: fix
+        'x-authrite-signature': requestSignature
+      }
+    })
+  }
+
+  /**
    * @public
    * Adds a newly created certificate to the cache
    * @param {object} certificate Certificate produced by createCertificate to be added to the cache.
@@ -451,5 +435,5 @@ class Authrite {
 }
 
 module.exports = {
-   Authrite
+  Authrite
 }
