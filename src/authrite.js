@@ -1,7 +1,7 @@
 const boomerang = require('boomerang-http')
 const bsv = require('babbage-bsv')
 const crypto = require('crypto')
-const { getPaymentAddress, getPaymentPrivateKey } = require('sendover')
+const { getPaymentPrivateKey } = require('sendover')
 const BabbageSDK = require('@babbage/sdk')
 const { verifyCertificateSignature } = require('authrite-utils')
 const io = require('socket.io-client')
@@ -132,13 +132,16 @@ class Authrite {
       }
     )
     // Note: are clients and servers passed by references or copy?
-    await verifyServerSignature(
-      AUTHRITE_VERSION,
+    await verifyServerSignature({
+      authriteVersion: AUTHRITE_VERSION,
       baseUrl,
-      this.clients,
-      this.servers,
-      serverResponse
-    )
+      signingStrategy: this.signingStrategy,
+      clientPrivateKey: this.clientPrivateKey,
+      clients: this.clients,
+      servers: this.servers,
+      serverResponse,
+      certificates: this.servers[baseUrl].requestedCertificates // Verify this is expected
+    })
   }
 
   /**
@@ -305,7 +308,22 @@ class Authrite {
       }
     )
     const messageToVerify = await response.arrayBuffer()
-    await verifyServerResponse(messageToVerify, response.headers, requestNonce, baseUrl)
+
+    // Parse out response headers
+    const headers = {}
+    response.headers.forEach((value, name) => {
+      headers[name] = value
+    })
+
+    await verifyServerResponse({
+      messageToVerify,
+      headers,
+      requestNonce,
+      baseUrl,
+      signingStrategy: this.signingStrategy,
+      servers: this.servers,
+      clientPrivateKey: this.clientPrivateKey
+    })
 
     return {
       status: response.status,
@@ -343,21 +361,21 @@ class Authrite {
       }
     })
 
-    this.socket.on('validationResponse', async (data) => {
-      console.log('Server says:', data)
-      this.serverPublicKey = data.serverPublicKey
+    this.socket.on('validationResponse', async (serverResponse) => {
+      console.log('Server says:', serverResponse)
+      this.serverPublicKey = serverResponse.serverPublicKey
 
       // Note: potential to hang while waiting...
-      await verifyServerSignature(
-        AUTHRITE_VERSION,
-        connectionUrl,
-        this.signingStrategy,
-        this.clientPrivateKey,
-        this.clients,
-        this.servers,
-        data,
-        this.certificates
-      )
+      await verifyServerSignature({
+        authriteVersion: AUTHRITE_VERSION,
+        baseUrl: connectionUrl,
+        signingStrategy: this.signingStrategy,
+        clientPrivateKey: this.clientPrivateKey,
+        clients: this.clients,
+        servers: this.servers,
+        serverResponse,
+        certificates: this.certificates
+      })
       console.log('Server initial response verified!')
     })
 

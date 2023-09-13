@@ -2,7 +2,7 @@ const { getPaymentAddress } = require('sendover')
 const BabbageSDK = require('@babbage/sdk')
 const bsv = require('babbage-bsv')
 
-const verifyServerSignature = async (authriteVersion, baseUrl, signingStrategy, clientPrivateKey, clients, servers, serverResponse, certificates) => {
+const verifyServerSignature = async ({ authriteVersion, baseUrl, signingStrategy, clientPrivateKey, clients, servers, serverResponse, certificates }) => {
   // Check serverResponse for errors
   if (serverResponse.status === 'error') {
     servers[baseUrl].updating = false
