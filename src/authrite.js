@@ -5,7 +5,7 @@ const { getPaymentPrivateKey } = require('sendover')
 const BabbageSDK = require('@babbage/sdk')
 const { verifyCertificateSignature } = require('authrite-utils')
 const io = require('socket.io-client')
-const verifyServerSignature = require('./utils/verifyServerSignature')
+const verifyServerInitialResponse = require('./utils/verifyServerInitialResponse')
 const verifyServerResponse = require('./utils/verifyServerResponse')
 
 // The correct versions of URL and fetch should be used
@@ -132,7 +132,7 @@ class Authrite {
       }
     )
     // Note: are clients and servers passed by references or copy?
-    await verifyServerSignature({
+    await verifyServerInitialResponse({
       authriteVersion: AUTHRITE_VERSION,
       baseUrl,
       signingStrategy: this.signingStrategy,
@@ -308,7 +308,7 @@ class Authrite {
       }
     )
     const messageToVerify = await response.arrayBuffer()
-
+    debugger
     // Parse out response headers
     const headers = {}
     response.headers.forEach((value, name) => {
@@ -366,7 +366,7 @@ class Authrite {
       this.serverPublicKey = serverResponse.serverPublicKey
 
       // Note: potential to hang while waiting...
-      await verifyServerSignature({
+      await verifyServerInitialResponse({
         authriteVersion: AUTHRITE_VERSION,
         baseUrl: connectionUrl,
         signingStrategy: this.signingStrategy,
@@ -381,15 +381,16 @@ class Authrite {
 
     this.socket.on('serverResponse', async (data) => {
       const baseUrl = 'http://localhost:4000'
-      await verifyServerResponse(
-        'test',
-        data.headers,
-        this.clients[baseUrl].nonce,
+      console.log(data.headers)
+      await verifyServerResponse({
+        messageToVerify: 'test',
+        headers: data.headers,
+        requestNonce: this.clients[baseUrl].nonce,
         baseUrl,
-        this.signingStrategy,
-        this.servers,
-        this.clientPrivateKey
-      )
+        signingStrategy: this.signingStrategy,
+        servers: this.servers,
+        clientPrivateKey: this.clientPrivateKey
+      })
       console.log('Server response verified!')
     })
 

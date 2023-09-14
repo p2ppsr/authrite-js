@@ -2,7 +2,15 @@ const BabbageSDK = require('@babbage/sdk')
 const { getPaymentAddress } = require('sendover')
 const bsv = require('babbage-bsv')
 
-const verifyServerResponse = async ({ messageToVerify, headers, requestNonce, baseUrl, signingStrategy, servers, clientPrivateKey }) => {
+const verifyServerResponse = async ({
+  messageToVerify,
+  headers,
+  requestNonce,
+  baseUrl,
+  signingStrategy,
+  servers,
+  clientPrivateKey
+}) => {
   // When the server response comes back, validate the signature according to the specification
   let signature, verified
   // Construct the message for verification
