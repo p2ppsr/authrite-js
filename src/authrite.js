@@ -87,7 +87,7 @@ class Authrite {
         .publicKey.toString()
     } else {
       this.signingStrategy = signingStrategy
-      // The clientPublicKey will be retrieved from the SDK in the inital request
+      // The clientPublicKey will be retrieved from the SDK in the initial request
       this.clientPublicKey = null
     }
     this.initialRequestPath = initialRequestPath
@@ -308,7 +308,7 @@ class Authrite {
       }
     )
     const messageToVerify = await response.arrayBuffer()
-    debugger
+
     // Parse out response headers
     const headers = {}
     response.headers.forEach((value, name) => {
@@ -343,6 +343,12 @@ class Authrite {
   async connect (connectionUrl, config = {}) {
     this.clients[connectionUrl] = new Client()
     this.servers[connectionUrl] = new Server(connectionUrl, null, null, [], [])
+
+    // Note: How do I know which server I am connection to over web sockets
+    // when the on or emit functions are invoked?
+    // Temp Solution
+    this.socketConnectionUrl = connectionUrl
+
     // Retrieve the client's public identity key for the initial request
     if (!this.clientPublicKey && this.signingStrategy === 'Babbage') {
       this.clientPublicKey = await BabbageSDK.getPublicKey({
@@ -351,24 +357,26 @@ class Authrite {
     }
 
     // Handle the initial request
-    this.socket = io.connect(connectionUrl, {
+    this.socket = io.connect(this.socketConnectionUrl, {
       extraHeaders: {
         'x-authrite': AUTHRITE_VERSION,
         'x-message-type': 'initialRequest',
         'x-authrite-identity-key': this.clientPublicKey,
-        'x-authrite-nonce': this.clients[connectionUrl].nonce,
-        'x-authrite-certificates': this.servers[connectionUrl].requestedCertificates // TODO: provide requested certificates
+        'x-authrite-nonce': this.clients[this.socketConnectionUrl].nonce,
+        'x-authrite-certificates': this.servers[this.socketConnectionUrl].requestedCertificates // TODO: provide requested certificates
       }
     })
 
+    // Validate the server's initial response (TODO maybe rename)
     this.socket.on('validationResponse', async (serverResponse) => {
       console.log('Server says:', serverResponse)
       this.serverPublicKey = serverResponse.serverPublicKey
 
       // Note: potential to hang while waiting...
+      // TODO: Consider HTTPS error format and match it with sockets...
       await verifyServerInitialResponse({
         authriteVersion: AUTHRITE_VERSION,
-        baseUrl: connectionUrl,
+        baseUrl: this.socketConnectionUrl,
         signingStrategy: this.signingStrategy,
         clientPrivateKey: this.clientPrivateKey,
         clients: this.clients,
@@ -379,45 +387,55 @@ class Authrite {
       console.log('Server initial response verified!')
     })
 
-    this.socket.on('serverResponse', async (data) => {
-      const baseUrl = 'http://localhost:4000'
-      console.log(data.headers)
-      await verifyServerResponse({
-        messageToVerify: 'test',
-        headers: data.headers,
-        requestNonce: this.clients[baseUrl].nonce,
-        baseUrl,
-        signingStrategy: this.signingStrategy,
-        servers: this.servers,
-        clientPrivateKey: this.clientPrivateKey
-      })
-      console.log('Server response verified!')
-    })
-
     // Return the current Authrite instance for direct access
     return this
   }
 
+  on (event, callback) {
+    if (!this.socket) {
+      const e = new Error('You must first configure a socket connection!')
+      e.code = 'ERR_MISSING_SOCKET'
+      throw e
+    }
+
+    // Define a custom wrapped callback to authenticate headers provided
+    const wrappedCallback = async (body) => {
+      // Call the helper auth function
+      await verifyServerResponse({
+        messageToVerify: JSON.stringify(body.data),
+        headers: body.headers,
+        requestNonce: this.clients[this.socketConnectionUrl].nonce,
+        baseUrl: this.socketConnectionUrl,
+        signingStrategy: this.signingStrategy,
+        servers: this.servers,
+        clientPrivateKey: this.clientPrivateKey
+      })
+      // Invoke the expected inner callback function (minus the headers)
+      callback(body.data)
+    }
+    // Call the base socket on function with modified callback
+    this.socket.on(event, wrappedCallback)
+  }
+
   async emit (event, data) {
-    const baseUrl = 'http://localhost:4000'
-    this.clients[baseUrl].nonce = crypto.randomBytes(32).toString('base64')
-    // Note: does the server initial nonce need to be saved?
+    this.clients[this.socketConnectionUrl].nonce = crypto.randomBytes(32).toString('base64')
 
     let requestSignature = await BabbageSDK.createSignature({
-      data: Buffer.from('test'),
+      data: Buffer.from(JSON.stringify(data)),
       protocolID: [2, 'authrite message signature'],
-      keyID: `${this.clients[baseUrl].nonce} ${this.servers[baseUrl].nonce}`,
-      counterparty: this.servers[baseUrl].identityPublicKey
+      keyID: `${this.clients[this.socketConnectionUrl].nonce} ${this.servers[this.socketConnectionUrl].nonce}`,
+      counterparty: this.servers[this.socketConnectionUrl].identityPublicKey
     })
     // The request signature must be in hex
     requestSignature = Buffer.from(requestSignature).toString('hex')
 
+    // Send off the original emit request + auth headers
     this.socket.emit(event, {
       data,
       headers: {
         'x-authrite-identity-key': this.clientPublicKey,
-        'x-authrite-nonce': this.clients[baseUrl].nonce,
-        'x-authrite-yournonce': this.servers[baseUrl].nonce,
+        'x-authrite-nonce': this.clients[this.socketConnectionUrl].nonce,
+        'x-authrite-yournonce': this.servers[this.socketConnectionUrl].nonce,
         'x-authrite-signature': requestSignature
       }
     })
