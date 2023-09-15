@@ -1,4 +1,4 @@
 module.exports = {
-    ...require('./authrite'),
-    ...require('./AuthriteClient')
+  ...require('./authrite'),
+  ...require('./AuthriteClient')
 }

@@ -102,7 +102,7 @@ describe('authrite', () => {
     })
     // Adding a signature with a new signature adds it to certificates with additional "keyrings: {}" prop.
     // The only certificate property that matters is "signature"
-    const dummyTestCert = { signature: '<signature_as_hex_string_1>'}
+    const dummyTestCert = { signature: '<signature_as_hex_string_1>' }
     expect(authrite.certificates.length).toEqual(0)
     authrite.addCertificate(dummyTestCert)
     expect(authrite.certificates.length).toEqual(1)
