@@ -131,7 +131,7 @@ class Authrite {
         requestedCertificates: this.servers[baseUrl].requestedCertificates // TODO: provide requested certificates
       }
     )
-    // Note: are clients and servers passed by references or copy?
+    // Verify the server's initial response
     await verifyServerInitialResponse({
       authriteVersion: AUTHRITE_VERSION,
       baseUrl,
@@ -142,6 +142,39 @@ class Authrite {
       serverResponse,
       certificates: this.servers[baseUrl].requestedCertificates // Verify this is expected
     })
+  }
+
+  /**
+   * Helper function for creating a request signature
+   * @param {string | buffer} dataToSign
+   * @param {string} baseUrl
+   */
+  async createRequestSignature ({ dataToSign, requestNonce, baseUrl }) {
+    let requestSignature
+    if (this.signingStrategy === 'Babbage') {
+      requestSignature = await BabbageSDK.createSignature({
+        data: Buffer.from(dataToSign),
+        protocolID: [2, 'authrite message signature'],
+        keyID: `${requestNonce} ${this.servers[baseUrl].nonce}`,
+        counterparty: this.servers[baseUrl].identityPublicKey
+      })
+      // The request signature must be in hex
+      requestSignature = Buffer.from(requestSignature).toString('hex')
+    } else {
+      const derivedClientPrivateKey = getPaymentPrivateKey({
+        recipientPrivateKey: this.clientPrivateKey,
+        senderPublicKey: this.servers[baseUrl].identityPublicKey,
+        invoiceNumber: `2-authrite message signature-${requestNonce} ${this.servers[baseUrl].nonce}`,
+        returnType: 'wif'
+      })
+      // Create a request signature
+      requestSignature = bsv.crypto.ECDSA.sign(
+        bsv.crypto.Hash.sha256(Buffer.from(dataToSign)),
+        bsv.PrivateKey.fromWIF(derivedClientPrivateKey)
+      )
+      requestSignature = requestSignature.toString()
+    }
+    return requestSignature
   }
 
   /**
@@ -207,30 +240,7 @@ class Authrite {
     // we want to generates a new requestNonce
     // and use it together with the server’s initialNonce for key derivation
     const requestNonce = crypto.randomBytes(32).toString('base64')
-    let requestSignature
-    if (this.signingStrategy === 'Babbage') {
-      requestSignature = await BabbageSDK.createSignature({
-        data: Buffer.from(dataToSign),
-        protocolID: [2, 'authrite message signature'],
-        keyID: `${requestNonce} ${this.servers[baseUrl].nonce}`,
-        counterparty: this.servers[baseUrl].identityPublicKey
-      })
-      // The request signature must be in hex
-      requestSignature = Buffer.from(requestSignature).toString('hex')
-    } else {
-      const derivedClientPrivateKey = getPaymentPrivateKey({
-        recipientPrivateKey: this.clientPrivateKey,
-        senderPublicKey: this.servers[baseUrl].identityPublicKey,
-        invoiceNumber: `2-authrite message signature-${requestNonce} ${this.servers[baseUrl].nonce}`,
-        returnType: 'wif'
-      })
-      // Create a request signature
-      requestSignature = bsv.crypto.ECDSA.sign(
-        bsv.crypto.Hash.sha256(Buffer.from(dataToSign)),
-        bsv.PrivateKey.fromWIF(derivedClientPrivateKey)
-      )
-      requestSignature = requestSignature.toString()
-    }
+    const requestSignature = await this.createRequestSignature({ dataToSign, requestNonce, baseUrl })
 
     // Provide a list of certificates with acceptable type and certifier values for the request, based on what the server requested.
     const requestedCerts = this.servers[baseUrl].requestedCertificates
@@ -315,6 +325,7 @@ class Authrite {
       headers[name] = value
     })
 
+    // Make sure the server properly authenticates itself
     await verifyServerResponse({
       messageToVerify,
       headers,
@@ -337,8 +348,8 @@ class Authrite {
 
   /**
    * Support initializing a socket connection to a server
-   * @param {*} connectionUrl
-   * @param {*} config
+   * @param {string} connectionUrl
+   * @param {object} config
    */
   async connect (connectionUrl, config = {}) {
     this.clients[connectionUrl] = new Client()
@@ -367,9 +378,19 @@ class Authrite {
       }
     })
 
+    // Log any error's returned by the socket middleware
+    this.socket.on('connect_error', (err) => {
+      console.error(err)
+    })
+
     // Validate the server's initial response (TODO maybe rename)
     this.socket.on('validationResponse', async (serverResponse) => {
       console.log('Server says:', serverResponse)
+      if (serverResponse.status === 'error') {
+        const e = new Error(serverResponse.message)
+        e.code = serverResponse.code
+        throw e
+      }
       this.serverPublicKey = serverResponse.serverPublicKey
 
       // Note: potential to hang while waiting...
@@ -418,16 +439,12 @@ class Authrite {
   }
 
   async emit (event, data) {
+    // Save the latest request nonce per "request"
     this.clients[this.socketConnectionUrl].nonce = crypto.randomBytes(32).toString('base64')
 
-    let requestSignature = await BabbageSDK.createSignature({
-      data: Buffer.from(JSON.stringify(data)),
-      protocolID: [2, 'authrite message signature'],
-      keyID: `${this.clients[this.socketConnectionUrl].nonce} ${this.servers[this.socketConnectionUrl].nonce}`,
-      counterparty: this.servers[this.socketConnectionUrl].identityPublicKey
-    })
-    // The request signature must be in hex
-    requestSignature = Buffer.from(requestSignature).toString('hex')
+    // Create a request signature over the data to emit
+    const requestSignature = await this.createRequestSignature({ dataToSign: JSON.stringify(data), requestNonce, baseUrl: this.socketConnectionUrl })
+    console.log(requestSignature)
 
     // Send off the original emit request + auth headers
     this.socket.emit(event, {
