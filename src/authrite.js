@@ -439,8 +439,9 @@ class Authrite {
   }
 
   async emit (event, data) {
+    const requestNonce = crypto.randomBytes(32).toString('base64')
     // Save the latest request nonce per "request"
-    this.clients[this.socketConnectionUrl].nonce = crypto.randomBytes(32).toString('base64')
+    this.clients[this.socketConnectionUrl].nonce = requestNonce
 
     // Create a request signature over the data to emit
     const requestSignature = await this.createRequestSignature({ dataToSign: JSON.stringify(data), requestNonce, baseUrl: this.socketConnectionUrl })
