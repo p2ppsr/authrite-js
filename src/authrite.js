@@ -7,6 +7,7 @@ const { verifyCertificateSignature } = require('authrite-utils')
 const io = require('socket.io-client')
 const verifyServerInitialResponse = require('./utils/verifyServerInitialResponse')
 const verifyServerResponse = require('./utils/verifyServerResponse')
+const getCertificatesToInclude = require('./utils/getCertificatesToInclude')
 
 // The correct versions of URL and fetch should be used
 let fetch, URL
@@ -22,7 +23,7 @@ if (typeof window !== 'undefined') {
   URL = require('url').URL
 }
 
-const AUTHRITE_VERSION = '0.1'
+const AUTHRITE_VERSION = '0.2'
 
 /**
    * The client requesting communication with the server
@@ -120,6 +121,8 @@ class Authrite {
         identityKey: true
       })
     }
+
+    // Send an initial request to the server
     const serverResponse = await boomerang(
       'POST',
       baseUrl + this.initialRequestPath,
@@ -131,6 +134,7 @@ class Authrite {
         requestedCertificates: this.servers[baseUrl].requestedCertificates // TODO: provide requested certificates
       }
     )
+
     // Verify the server's initial response
     await verifyServerInitialResponse({
       authriteVersion: AUTHRITE_VERSION,
@@ -140,12 +144,13 @@ class Authrite {
       clients: this.clients,
       servers: this.servers,
       serverResponse,
-      certificates: this.servers[baseUrl].requestedCertificates // Verify this is expected
+      certificates: this.certificates
     })
   }
 
   /**
    * Helper function for creating a request signature
+   * The client's random nonce should be used as part of the signature creation
    * @param {string | buffer} dataToSign
    * @param {string} baseUrl
    */
@@ -243,63 +248,12 @@ class Authrite {
     const requestSignature = await this.createRequestSignature({ dataToSign, requestNonce, baseUrl })
 
     // Provide a list of certificates with acceptable type and certifier values for the request, based on what the server requested.
-    const requestedCerts = this.servers[baseUrl].requestedCertificates
-    let certificatesToInclude = this.certificates.filter(cert =>
-      requestedCerts.certifiers.includes(cert.certifier) &&
-      Object.keys(requestedCerts.types).includes(cert.type)
-    )
-
-    await Promise.all(certificatesToInclude.map(async cert => {
-      // Check if a keyring exists for this server/verifier.
-      const verifierKeyring = cert.keyrings[this.servers[baseUrl].identityPublicKey]
-      const requestedFields = this.servers[baseUrl].requestedCertificates.types[cert.type]
-
-      // IF an existing keyring has been found, compare the list of fields from the keyring with the list of fields this server is requesting for this certificate type.
-      // TODO: Consider refactoring array comparison.
-      if (
-        !verifierKeyring ||
-        JSON.stringify(Object.keys(verifierKeyring)) !==
-        JSON.stringify(requestedFields)
-      ) {
-        // If there are differences, or no keyring, SDK proveCertificate function generates a new keyring for this verifier containing only the verifier’s requested fields.
-        // Ensure Babbage signing strategy is used
-        if (this.signingStrategy !== 'Babbage') {
-          const e = new Error('No valid keyring, or method for obtaining keyring, for this certificate and verifier!')
-          e.code = 'ERR_NO_CERT_PROOF_STRATEGY'
-          throw e
-        }
-        const { keyring } = await BabbageSDK.proveCertificate({
-          certificate: {
-            fields: cert.fields,
-            serialNumber: cert.serialNumber,
-            validationKey: cert.validationKey,
-            certifier: cert.certifier,
-            subject: cert.subject,
-            type: cert.type,
-            revocationOutpoint: cert.revocationOutpoint,
-            signature: cert.signature
-          },
-          fieldsToReveal: requestedFields,
-          verifierPublicIdentityKey: this.servers[baseUrl].identityPublicKey
-        })
-        // Save the keyring for this verifier
-        cert.keyrings[this.servers[baseUrl].identityPublicKey] = keyring
-      }
-      cert.keyring = cert.keyrings[this.servers[baseUrl].identityPublicKey]
-    }))
-
-    // Remove all extra from the certificates
-    certificatesToInclude = certificatesToInclude.map(cert => ({
-      fields: cert.fields,
-      serialNumber: cert.serialNumber,
-      validationKey: cert.validationKey,
-      certifier: cert.certifier,
-      subject: cert.subject,
-      type: cert.type,
-      revocationOutpoint: cert.revocationOutpoint,
-      signature: cert.signature,
-      keyring: cert.keyring
-    }))
+    const certificatesToInclude = await getCertificatesToInclude({
+      signingStrategy: this.signingStrategy,
+      baseUrl: this.baseUrl,
+      servers: this.servers,
+      certificates: this.certificates
+    })
 
     // Send the signed Authrite fetch request with the HTTP headers according to the specification
     const response = await fetch(
@@ -311,6 +265,7 @@ class Authrite {
           'x-authrite': AUTHRITE_VERSION,
           'x-authrite-identity-key': this.clientPublicKey,
           'x-authrite-nonce': requestNonce,
+          'x-authrite-initialnonce': this.clients[baseUrl].nonce,
           'x-authrite-yournonce': this.servers[baseUrl].nonce,
           'x-authrite-certificates': JSON.stringify(certificatesToInclude),
           'x-authrite-signature': requestSignature
@@ -329,9 +284,9 @@ class Authrite {
     await verifyServerResponse({
       messageToVerify,
       headers,
-      requestNonce,
       baseUrl,
       signingStrategy: this.signingStrategy,
+      clients: this.clients,
       servers: this.servers,
       clientPrivateKey: this.clientPrivateKey
     })
@@ -381,20 +336,29 @@ class Authrite {
     // Log any error's returned by the socket middleware
     this.socket.on('connect_error', (err) => {
       console.error(err)
+      // TODO: Test connection errors
+      if (err instanceof Error) {
+        throw err
+      }
     })
 
-    // Validate the server's initial response (TODO maybe rename)
+    // Handle custom thrown errors
+    this.socket.on('error', (msg) => {
+      console.error(msg)
+      const errMsg = msg.data
+      const error = new Error(errMsg.description)
+      error.code = errMsg.code
+      throw error
+    })
+
+    // Validate the server's initial response
     this.socket.on('validationResponse', async (serverResponse) => {
       console.log('Server says:', serverResponse)
-      if (serverResponse.status === 'error') {
-        const e = new Error(serverResponse.message)
-        e.code = serverResponse.code
-        throw e
-      }
+      // Note: error handling required here on response?
+      // TODO: Test response with errors
       this.serverPublicKey = serverResponse.serverPublicKey
 
       // Note: potential to hang while waiting...
-      // TODO: Consider HTTPS error format and match it with sockets...
       await verifyServerInitialResponse({
         authriteVersion: AUTHRITE_VERSION,
         baseUrl: this.socketConnectionUrl,
@@ -425,9 +389,9 @@ class Authrite {
       await verifyServerResponse({
         messageToVerify: JSON.stringify(body.data),
         headers: body.headers,
-        requestNonce: this.clients[this.socketConnectionUrl].nonce,
         baseUrl: this.socketConnectionUrl,
         signingStrategy: this.signingStrategy,
+        clients: this.clients,
         servers: this.servers,
         clientPrivateKey: this.clientPrivateKey
       })
@@ -440,21 +404,28 @@ class Authrite {
 
   async emit (event, data) {
     const requestNonce = crypto.randomBytes(32).toString('base64')
-    // Save the latest request nonce per "request"
-    this.clients[this.socketConnectionUrl].nonce = requestNonce
 
     // Create a request signature over the data to emit
     const requestSignature = await this.createRequestSignature({ dataToSign: JSON.stringify(data), requestNonce, baseUrl: this.socketConnectionUrl })
-    console.log(requestSignature)
+
+    // Provide a list of certificates with acceptable type and certifier values for the request, based on what the server requested.
+    const certificatesToInclude = await getCertificatesToInclude({
+      signingStrategy: this.signingStrategy,
+      baseUrl: this.baseUrl,
+      servers: this.servers,
+      certificates: this.certificates
+    })
 
     // Send off the original emit request + auth headers
     this.socket.emit(event, {
       data,
       headers: {
+        'x-authrite': AUTHRITE_VERSION,
         'x-authrite-identity-key': this.clientPublicKey,
-        'x-authrite-nonce': this.clients[this.socketConnectionUrl].nonce,
+        'x-authrite-nonce': requestNonce,
         'x-authrite-yournonce': this.servers[this.socketConnectionUrl].nonce,
-        'x-authrite-signature': requestSignature
+        'x-authrite-signature': requestSignature,
+        'x-authrite-certificates': JSON.stringify(certificatesToInclude)
       }
     })
   }

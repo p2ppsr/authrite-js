@@ -2,7 +2,28 @@ const { getPaymentAddress } = require('sendover')
 const BabbageSDK = require('@babbage/sdk')
 const bsv = require('babbage-bsv')
 
-const verifyServerInitialResponse = async ({ authriteVersion, baseUrl, signingStrategy, clientPrivateKey, clients, servers, serverResponse, certificates }) => {
+/**
+ * Verifies a server's initial response as part of the initial handshake
+ * @param {object} obj - all params given in an object
+ * @param {string} obj.authriteVersion - the current version of Authrite being used by the server
+ * @param {string} obj.baseUrl - the baseUrl of the server
+ * @param {string} obj.signingStrategy - specifies which signing strategy should be used
+ * @param {string | buffer | undefined} [obj.clientPrivateKey] - clientPrivateKey to use for key derivation
+ * @param {object} obj.clients - the clients the current Authrite instance is interacting with
+ * @param {object} obj.servers - the servers the current Authrite instance is interacting with
+ * @param {object} obj.serverResponse - contains the server's response including the required authentication data
+ * @param {Array}  obj.certificates - the current available certificates
+*/
+const verifyServerInitialResponse = async ({
+  authriteVersion,
+  baseUrl,
+  signingStrategy,
+  clientPrivateKey,
+  clients,
+  servers,
+  serverResponse,
+  certificates
+}) => {
   // Check serverResponse for errors
   if (serverResponse.status === 'error') {
     servers[baseUrl].updating = false
@@ -11,21 +32,26 @@ const verifyServerInitialResponse = async ({ authriteVersion, baseUrl, signingSt
     throw e
   }
 
+  // Validate the required data is provided
   if (
     serverResponse.authrite !== authriteVersion ||
-        serverResponse.messageType !== 'initialResponse'
+    serverResponse.messageType !== 'initialResponse'
   ) {
     servers[baseUrl].updating = false
     const e = new Error('Authrite version incompatible')
     e.code = 'ERR_INVALID_AUTHRITE_VERSION'
     throw e
   }
+
   // Validate server signature
   let signature, verified
   // Construct the message for verification
   const messageToVerify = clients[baseUrl].nonce + serverResponse.nonce
+
+  // Determine which signing strategy to use
   if (signingStrategy === 'Babbage') {
     signature = Buffer.from(serverResponse.signature, 'hex').toString('base64')
+
     // Verify the signature created by the SDK
     verified = await BabbageSDK.verifySignature({
       data: Buffer.from(messageToVerify),
@@ -42,6 +68,7 @@ const verifyServerInitialResponse = async ({ authriteVersion, baseUrl, signingSt
       invoiceNumber: `2-authrite message signature-${clients[baseUrl].nonce} ${serverResponse.nonce}`,
       returnType: 'publicKey'
     })
+
     // 2. Verify the signature
     signature = bsv.crypto.Signature.fromString(serverResponse.signature)
     verified = bsv.crypto.ECDSA.verify(
@@ -50,6 +77,7 @@ const verifyServerInitialResponse = async ({ authriteVersion, baseUrl, signingSt
       bsv.PublicKey.fromString(signingPublicKey)
     )
   }
+
   // Determine if the signature was verified
   if (!verified) {
     servers[baseUrl].updating = false
@@ -57,12 +85,15 @@ const verifyServerInitialResponse = async ({ authriteVersion, baseUrl, signingSt
     e.code = 'ERR_INVALID_SIGNATURE'
     throw e
   }
+
+  // Save the server's identity key and initial nonce
+  // This allows future requests to be linked to the same session
   servers[baseUrl].identityPublicKey = serverResponse.identityKey
   servers[baseUrl].nonce = serverResponse.nonce
 
   // Check certificates were requested, and that the client is using Babbage as the signing strategy
   if (serverResponse.requestedCertificates && serverResponse.requestedCertificates.certifiers && serverResponse.requestedCertificates.certifiers.length !== 0 && this.signingStrategy === 'Babbage') {
-  // Find matching certificates
+    // Find matching certificates
     let matchingCertificates = await BabbageSDK.getCertificates({
       certifiers: serverResponse.requestedCertificates.certifiers,
       types: serverResponse.requestedCertificates.types
@@ -76,6 +107,7 @@ const verifyServerInitialResponse = async ({ authriteVersion, baseUrl, signingSt
         cert.keyrings = {}
         return cert
       })
+
       // Check if cert is already added to this.certificates to prevent duplicates
       // Note: Valid certificates with identical signatures are always identical
       matchingCertificates.forEach(cert => {
