@@ -250,7 +250,7 @@ class Authrite {
     // Provide a list of certificates with acceptable type and certifier values for the request, based on what the server requested.
     const certificatesToInclude = await getCertificatesToInclude({
       signingStrategy: this.signingStrategy,
-      baseUrl: this.baseUrl,
+      baseUrl,
       servers: this.servers,
       certificates: this.certificates
     })
@@ -411,7 +411,7 @@ class Authrite {
     // Provide a list of certificates with acceptable type and certifier values for the request, based on what the server requested.
     const certificatesToInclude = await getCertificatesToInclude({
       signingStrategy: this.signingStrategy,
-      baseUrl: this.baseUrl,
+      baseUrl: this.socketConnectionUrl,
       servers: this.servers,
       certificates: this.certificates
     })
