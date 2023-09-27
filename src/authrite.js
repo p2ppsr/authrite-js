@@ -337,7 +337,7 @@ class Authrite {
         'x-message-type': 'initialRequest',
         'x-authrite-identity-key': this.clientPublicKey,
         'x-authrite-nonce': this.clients[this.socketConnectionUrl].nonce,
-        'x-authrite-certificates': this.servers[this.socketConnectionUrl].requestedCertificates // TODO: provide requested certificates
+        'x-authrite-certificates': this.servers[this.socketConnectionUrl].requestedCertificates
       }
     })
 
@@ -390,21 +390,25 @@ class Authrite {
       e.code = 'ERR_MISSING_SOCKET'
       throw e
     }
-
     // Define a custom wrapped callback to authenticate headers provided
     const wrappedCallback = async (body) => {
+      // Check if this is a custom or system call
+      if (body && body.data && body.headers) {
       // Call the helper auth function
-      await verifyServerResponse({
-        messageToVerify: JSON.stringify(body.data),
-        headers: body.headers,
-        baseUrl: this.socketConnectionUrl,
-        signingStrategy: this.signingStrategy,
-        clients: this.clients,
-        servers: this.servers,
-        clientPrivateKey: this.clientPrivateKey
-      })
-      // Invoke the expected inner callback function (minus the headers)
-      callback(body.data)
+        await verifyServerResponse({
+          messageToVerify: JSON.stringify(body.data),
+          headers: body.headers,
+          baseUrl: this.socketConnectionUrl,
+          signingStrategy: this.signingStrategy,
+          clients: this.clients,
+          servers: this.servers,
+          clientPrivateKey: this.clientPrivateKey
+        })
+        // Invoke the expected inner callback function (minus the headers)
+        callback(body.data)
+      } else {
+        callback(body)
+      }
     }
     // Call the base socket on function with modified callback
     this.socket.on(event, wrappedCallback)
