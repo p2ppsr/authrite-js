@@ -280,6 +280,14 @@ class Authrite {
       headers[name] = value
     })
 
+    // Make sure this is a valid Authrite response with the required headers
+    // If the requested route didn't exist, the headers may be missing
+    if (!headers['x-authrite']) {
+      const e = new Error('Missing required Authrite headers!')
+      e.code = 'ERR_MISSING_AUTHRITE_HEADERS'
+      throw e
+    }
+
     // Make sure the server properly authenticates itself
     await verifyServerResponse({
       messageToVerify,
