@@ -44,16 +44,17 @@ class AuthriteClient {
    * @param {object} body fields and values to be sent in body of this request
    * @returns {object} object constructed from body of response. UTF8 decoded. JSON.parse'd.
    */
+  // NOTE: This does not currently support GET requests!!
   async createSignedRequest (path, body) {
     let result = await this.authrite.request(
-            `${this.serverURL}${path}`,
-            {
-              body,
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json'
-              }
-            }
+      `${this.serverURL}${path}`,
+      {
+        body,
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      }
     )
     result = JSON.parse(Buffer.from(result.body).toString('utf8'))
     if (typeof result === 'object' && result.status === 'error') {

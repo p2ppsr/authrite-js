@@ -34,6 +34,7 @@
     "@babel/core": "^7.18.5",
     "@babel/preset-env": "^7.18.2",
     "babel-loader": "^8.2.5",
+    "cryptononce": "^0.1.1",
     "documentation": "^14.0.0",
     "fetch-mock": "^9.11.0",
     "jest": "^28.0.3",

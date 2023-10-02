@@ -131,7 +131,7 @@ class Authrite {
         messageType: 'initialRequest',
         identityKey: this.clientPublicKey,
         nonce: this.clients[baseUrl].nonce,
-        requestedCertificates: this.servers[baseUrl].requestedCertificates // TODO: provide requested certificates
+        requestedCertificates: this.servers[baseUrl].requestedCertificates
       }
     )
 
@@ -275,14 +275,14 @@ class Authrite {
     const messageToVerify = await response.arrayBuffer()
 
     // Parse out response headers
-    const headers = {}
+    const headers = response.headers
     response.headers.forEach((value, name) => {
       headers[name] = value
     })
 
     // Make sure this is a valid Authrite response with the required headers
     // If the requested route didn't exist, the headers may be missing
-    if (!headers['x-authrite']) {
+    if (!headers || !headers['x-authrite']) {
       const e = new Error('Missing required Authrite headers!')
       e.code = 'ERR_MISSING_AUTHRITE_HEADERS'
       throw e
@@ -311,8 +311,9 @@ class Authrite {
 
   /**
    * Support initializing a socket connection to a server
-   * @param {string} connectionUrl
-   * @param {object} config
+   * Currently implemented as a drop-in replacement for the socket.io wrapper of WebSockets
+   * @param {string} connectionUrl - the url of the server to connect to over web sockets
+   * @param {object} config - standard socket.io configuration param
    */
   async connect (connectionUrl, config = {}) {
     this.clients[connectionUrl] = new Client()
@@ -332,6 +333,7 @@ class Authrite {
 
     // Handle the initial request
     this.socket = io.connect(this.socketConnectionUrl, {
+      ...config,
       extraHeaders: {
         'x-authrite': AUTHRITE_VERSION,
         'x-message-type': 'initialRequest',

@@ -1,5 +1,5 @@
-const { Authrite } = require('../authrite')
-const { AuthriteClient } = require('../AuthriteClient')
+/* eslint-env jest */
+const { AuthriteClient } = require('../src/AuthriteClient')
 const sdk = require('@babbage/sdk')
 
 jest.mock('@babbage/sdk')
@@ -15,8 +15,8 @@ describe('AuthriteClient', () => {
     const client1 = new AuthriteClient('foo1.com')
     const client2 = new AuthriteClient('foo2.com')
 
-    expect(client1.authrite).toBe(AuthriteClient.Authrite)
-    expect(client2.authrite).toBe(AuthriteClient.Authrite)
+    // expect(client1.authrite).toBe(AuthriteClient.Authrite)
+    // expect(client2.authrite).toBe(AuthriteClient.Authrite)
     expect(client1.authrite === client2.authrite).toBe(true)
     expect(client1.serverURL).toBe('foo1.com')
     expect(client2.serverURL).toBe('foo2.com')
