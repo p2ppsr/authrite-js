@@ -42,7 +42,7 @@ const verifyServerResponse = async ({
     const signingPublicKey = getPaymentAddress({
       senderPrivateKey: clientPrivateKey,
       recipientPublicKey: servers[baseUrl].identityPublicKey,
-      invoiceNumber: '2-authrite message signature-' + clients[baseUrl].nonce + ' ' + headers['x-authrite-nonce'],
+      invoiceNumber: `2-authrite message signature-${clients[baseUrl].nonce} ${headers['x-authrite-nonce']}`,
       returnType: 'publicKey'
     })
 
