@@ -274,6 +274,13 @@ class Authrite {
     )
     const messageToVerify = await response.arrayBuffer()
 
+    // Handle route not found errors
+    if (response.status === 404) {
+      const e = new Error(`The requested route at ${requestUrl} was not found!`)
+      e.code = 'ERR_NOT_FOUND'
+      throw e
+    }
+
     // Parse out response headers
     const headers = response.headers
     response.headers.forEach((value, name) => {
