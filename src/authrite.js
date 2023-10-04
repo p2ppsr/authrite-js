@@ -8,6 +8,7 @@ const io = require('socket.io-client')
 const verifyServerInitialResponse = require('./utils/verifyServerInitialResponse')
 const verifyServerResponse = require('./utils/verifyServerResponse')
 const getCertificatesToInclude = require('./utils/getCertificatesToInclude')
+const getRequestAuthHeaders = require('./utils/getRequestAuthHeaders')
 
 // The correct versions of URL and fetch should be used
 let fetch, URL
@@ -255,6 +256,17 @@ class Authrite {
       certificates: this.certificates
     })
 
+    // Get auth headers to be verified by the server
+    const authHeaders = await getRequestAuthHeaders({
+      authriteVersion: AUTHRITE_VERSION,
+      clientPublicKey: this.clientPublicKey,
+      requestNonce,
+      clientInitialNonce: this.clients[baseUrl].nonce,
+      serverInitialNonce: this.servers[baseUrl].nonce,
+      requestSignature,
+      certificatesToInclude: JSON.stringify(certificatesToInclude)
+    })
+
     // Send the signed Authrite fetch request with the HTTP headers according to the specification
     const response = await fetch(
       requestUrl,
@@ -262,13 +274,7 @@ class Authrite {
         ...fetchConfig,
         headers: {
           ...fetchConfig.headers,
-          'x-authrite': AUTHRITE_VERSION,
-          'x-authrite-identity-key': this.clientPublicKey,
-          'x-authrite-nonce': requestNonce,
-          'x-authrite-initialnonce': this.clients[baseUrl].nonce,
-          'x-authrite-yournonce': this.servers[baseUrl].nonce,
-          'x-authrite-certificates': JSON.stringify(certificatesToInclude),
-          'x-authrite-signature': requestSignature
+          ...authHeaders
         }
       }
     )
@@ -437,17 +443,21 @@ class Authrite {
       certificates: this.certificates
     })
 
+    // Get auth headers to be verified by the server
+    const authHeaders = await getRequestAuthHeaders({
+      authriteVersion: AUTHRITE_VERSION,
+      clientPublicKey: this.clientPublicKey,
+      requestNonce,
+      clientInitialNonce: this.clients[this.socketConnectionUrl].nonce,
+      serverInitialNonce: this.servers[this.socketConnectionUrl].nonce,
+      requestSignature,
+      certificatesToInclude: JSON.stringify(certificatesToInclude)
+    })
+
     // Send off the original emit request + auth headers
     this.socket.emit(event, {
       data,
-      headers: {
-        'x-authrite': AUTHRITE_VERSION,
-        'x-authrite-identity-key': this.clientPublicKey,
-        'x-authrite-nonce': requestNonce,
-        'x-authrite-yournonce': this.servers[this.socketConnectionUrl].nonce,
-        'x-authrite-signature': requestSignature,
-        'x-authrite-certificates': JSON.stringify(certificatesToInclude)
-      }
+      headers: authHeaders
     })
   }
 
