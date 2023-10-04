@@ -1,7 +1,6 @@
 const boomerang = require('boomerang-http')
 const bsv = require('babbage-bsv')
 const crypto = require('crypto')
-const { getPaymentPrivateKey } = require('sendover')
 const BabbageSDK = require('@babbage/sdk')
 const { verifyCertificateSignature } = require('authrite-utils')
 const io = require('socket.io-client')
@@ -9,6 +8,7 @@ const verifyServerInitialResponse = require('./utils/verifyServerInitialResponse
 const verifyServerResponse = require('./utils/verifyServerResponse')
 const getCertificatesToInclude = require('./utils/getCertificatesToInclude')
 const getRequestAuthHeaders = require('./utils/getRequestAuthHeaders')
+const createRequestSignature = require('./utils/createRequestSignature')
 
 // The correct versions of URL and fetch should be used
 let fetch, URL
@@ -93,11 +93,11 @@ class Authrite {
       this.clientPublicKey = null
     }
     this.initialRequestPath = initialRequestPath
-    /*
-      Servers and Clients are objects whose keys are base URLs and whose values are instances of the Server or Client class.
-    */
+
+    // Servers and Clients are objects whose keys are base URLs and whose values are instances of the Server or Client class.
     this.servers = {}
     this.clients = {}
+
     // Validate provided certificates
     certificates.forEach(cert => {
       if (!verifyCertificateSignature(cert)) {
@@ -147,40 +147,6 @@ class Authrite {
       serverResponse,
       certificates: this.certificates
     })
-  }
-
-  /**
-   * Helper function for creating a request signature
-   * The client's random nonce should be used as part of the signature creation
-   * @param {string | buffer} dataToSign
-   * @param {string} baseUrl
-   */
-  async createRequestSignature ({ dataToSign, requestNonce, baseUrl }) {
-    let requestSignature
-    if (this.signingStrategy === 'Babbage') {
-      requestSignature = await BabbageSDK.createSignature({
-        data: Buffer.from(dataToSign),
-        protocolID: [2, 'authrite message signature'],
-        keyID: `${requestNonce} ${this.servers[baseUrl].nonce}`,
-        counterparty: this.servers[baseUrl].identityPublicKey
-      })
-      // The request signature must be in hex
-      requestSignature = Buffer.from(requestSignature).toString('hex')
-    } else {
-      const derivedClientPrivateKey = getPaymentPrivateKey({
-        recipientPrivateKey: this.clientPrivateKey,
-        senderPublicKey: this.servers[baseUrl].identityPublicKey,
-        invoiceNumber: `2-authrite message signature-${requestNonce} ${this.servers[baseUrl].nonce}`,
-        returnType: 'wif'
-      })
-      // Create a request signature
-      requestSignature = bsv.crypto.ECDSA.sign(
-        bsv.crypto.Hash.sha256(Buffer.from(dataToSign)),
-        bsv.PrivateKey.fromWIF(derivedClientPrivateKey)
-      )
-      requestSignature = requestSignature.toString()
-    }
-    return requestSignature
   }
 
   /**
@@ -243,10 +209,9 @@ class Authrite {
     }
 
     // For subsequent requests,
-    // we want to generates a new requestNonce
-    // and use it together with the server’s initialNonce for key derivation
+    // we want to generates a new requestNonce and use it together with the server’s initialNonce for key derivation
     const requestNonce = crypto.randomBytes(32).toString('base64')
-    const requestSignature = await this.createRequestSignature({ dataToSign, requestNonce, baseUrl })
+    const requestSignature = await createRequestSignature({ dataToSign, requestNonce, baseUrl })
 
     // Provide a list of certificates with acceptable type and certifier values for the request, based on what the server requested.
     const certificatesToInclude = await getCertificatesToInclude({
@@ -302,7 +267,7 @@ class Authrite {
     }
 
     // Make sure the server properly authenticates itself
-    await verifyServerResponse({
+    const verified = await verifyServerResponse({
       messageToVerify,
       headers,
       baseUrl,
@@ -311,6 +276,13 @@ class Authrite {
       servers: this.servers,
       clientPrivateKey: this.clientPrivateKey
     })
+
+    // Throw an error if the signature verification fails
+    if (!verified) {
+      const e = new Error('Unable to verify Authrite server response signature!')
+      e.code = 'ERR_INVALID_SIGNATURE'
+      throw e
+    }
 
     return {
       status: response.status,
@@ -433,7 +405,7 @@ class Authrite {
     const requestNonce = crypto.randomBytes(32).toString('base64')
 
     // Create a request signature over the data to emit
-    const requestSignature = await this.createRequestSignature({ dataToSign: JSON.stringify(data), requestNonce, baseUrl: this.socketConnectionUrl })
+    const requestSignature = await createRequestSignature({ dataToSign: JSON.stringify(data), requestNonce, baseUrl: this.socketConnectionUrl })
 
     // Provide a list of certificates with acceptable type and certifier values for the request, based on what the server requested.
     const certificatesToInclude = await getCertificatesToInclude({

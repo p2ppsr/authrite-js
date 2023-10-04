@@ -56,12 +56,6 @@ const verifyServerResponse = async ({
       bsv.PublicKey.fromString(signingPublicKey)
     )
   }
-
-  // Throw an error if the signature verification fails
-  if (!verified) {
-    const e = new Error('Unable to verify Authrite server response signature!')
-    e.code = 'ERR_INVALID_SIGNATURE'
-    throw e
-  }
+  return verified
 }
 module.exports = verifyServerResponse

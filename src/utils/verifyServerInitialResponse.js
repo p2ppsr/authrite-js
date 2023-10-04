@@ -9,8 +9,8 @@ const bsv = require('babbage-bsv')
  * @param {string} obj.baseUrl - the baseUrl of the server
  * @param {string} obj.signingStrategy - specifies which signing strategy should be used
  * @param {string | buffer | undefined} [obj.clientPrivateKey] - clientPrivateKey to use for key derivation
- * @param {object} obj.clients - the clients the current Authrite instance is interacting with
- * @param {object} obj.servers - the servers the current Authrite instance is interacting with
+ * @param {object} obj.clients - object whose keys are base URLs and whose values are instances of the Client class
+ * @param {object} obj.servers - object whose keys are base URLs and whose values are instances of the Server class
  * @param {object} obj.serverResponse - contains the server's response including the required authentication data
  * @param {Array}  obj.certificates - the current available certificates
 */
