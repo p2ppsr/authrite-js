@@ -35,7 +35,7 @@ const getServerInitialResponse = async ({ data, serverPrivateKey, authriteVersio
   const derivedPrivateKey = getPaymentPrivateKey({
     recipientPrivateKey: serverPrivateKey,
     senderPublicKey: data.identityKey,
-    invoiceNumber: `2-authrite message signature-${data.nonce} ${serverNonce}`, // TODO: update express side
+    invoiceNumber: `2-authrite message signature-${data.nonce} ${serverNonce}`,
     returnType: 'hex'
   })
 

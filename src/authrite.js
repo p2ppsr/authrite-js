@@ -211,7 +211,13 @@ class Authrite {
     // For subsequent requests,
     // we want to generates a new requestNonce and use it together with the server’s initialNonce for key derivation
     const requestNonce = crypto.randomBytes(32).toString('base64')
-    const requestSignature = await createRequestSignature({ dataToSign, requestNonce, baseUrl })
+    const requestSignature = await createRequestSignature({
+      dataToSign,
+      requestNonce,
+      serverInitialNonce: this.servers[baseUrl].nonce,
+      clientPrivateKey: this.clientPrivateKey,
+      serverPublicKey: this.servers[baseUrl].identityPublicKey
+    })
 
     // Provide a list of certificates with acceptable type and certifier values for the request, based on what the server requested.
     const certificatesToInclude = await getCertificatesToInclude({
@@ -405,7 +411,13 @@ class Authrite {
     const requestNonce = crypto.randomBytes(32).toString('base64')
 
     // Create a request signature over the data to emit
-    const requestSignature = await createRequestSignature({ dataToSign: JSON.stringify(data), requestNonce, baseUrl: this.socketConnectionUrl })
+    const requestSignature = await createRequestSignature({
+      dataToSign: JSON.stringify(data),
+      requestNonce,
+      serverInitialNonce: this.servers[this.socketConnectionUrl].nonce,
+      clientPrivateKey: this.clientPrivateKey,
+      serverPublicKey: this.servers[this.socketConnectionUrl].identityPublicKey
+    })
 
     // Provide a list of certificates with acceptable type and certifier values for the request, based on what the server requested.
     const certificatesToInclude = await getCertificatesToInclude({
