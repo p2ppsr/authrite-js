@@ -355,9 +355,6 @@ class Authrite {
     // Validate the server's initial response
     this.socket.on('validationResponse', async (serverResponse) => {
       console.log('Server says:', serverResponse)
-      // Note: error handling required here on response?
-      // TODO: Test response with errors
-      this.serverPublicKey = serverResponse.serverPublicKey
 
       // Note: potential to hang while waiting...
       await verifyServerInitialResponse({
@@ -443,6 +440,10 @@ class Authrite {
       data,
       headers: authHeaders
     })
+  }
+
+  disconnect () {
+    this.socket.disconnect()
   }
 
   /**

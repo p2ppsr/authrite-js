@@ -33,6 +33,11 @@ const verifyServerInitialResponse = async ({
   }
 
   // Validate the required data is provided
+  if (serverResponse.identityKey === undefined) {
+    const e = new Error('Server initial response did not provided an identity public key!')
+    e.code = 'ERR_MISSING_SERVER_IDENTITY_KEY'
+    throw e
+  }
   if (
     serverResponse.authrite !== authriteVersion ||
     serverResponse.messageType !== 'initialResponse'

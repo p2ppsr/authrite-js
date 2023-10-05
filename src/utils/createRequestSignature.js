@@ -21,7 +21,7 @@ const createRequestSignature = async ({
   let requestSignature
 
   // Support both the Babbage and private key signing strategies
-  if (!clientPrivateKey) {
+  if (clientPrivateKey === undefined) {
     requestSignature = await BabbageSDK.createSignature({
       data: Buffer.from(dataToSign),
       protocolID: [2, 'authrite message signature'],
