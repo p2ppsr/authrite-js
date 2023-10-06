@@ -6,6 +6,7 @@
   "scripts": {
     "test": "jest",
     "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
     "doc": "documentation readme src/authrite.js -f md -s API -a public",
     "lint": "standard --fix .",
     "build": "webpack --config webpack.prod.js"

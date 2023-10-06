@@ -4,11 +4,15 @@ const crypto = require('crypto')
 const BabbageSDK = require('@babbage/sdk')
 const { verifyCertificateSignature } = require('authrite-utils')
 const io = require('socket.io-client')
-const verifyServerInitialResponse = require('./utils/verifyServerInitialResponse')
-const verifyServerResponse = require('./utils/verifyServerResponse')
-const getCertificatesToInclude = require('./utils/getCertificatesToInclude')
-const getRequestAuthHeaders = require('./utils/getRequestAuthHeaders')
-const createRequestSignature = require('./utils/createRequestSignature')
+
+// Import client-side util functions
+const {
+  verifyServerInitialResponse,
+  verifyServerResponse,
+  getCertificatesToInclude,
+  getRequestAuthHeaders,
+  createRequestSignature
+} = require('authrite-utils')
 
 // The correct versions of URL and fetch should be used
 let fetch, URL
