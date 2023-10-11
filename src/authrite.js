@@ -60,14 +60,18 @@ class Server {
   }
 }
 
+/**
+ * Client-side API for establishing authenticated server communication
+ * @public
+ */
 class Authrite {
   /**
-   * Client-side API for establishing authenticated server communication
+   * Initialize a new instance of an Authrite client with the given parameters
    * @public
-   * @param {object} authrite All parameters are given in an object.
-   * @param {String} authrite.clientPrivateKey The client's private key used for derivations
-   * @param {String} authrite.initialRequestPath Initial request path for establishing a connection
-   * @param {Array} authrite.certificates Provided certificates from the client
+   * @param {object} obj All parameters are given in an object.
+   * @param {String} obj.clientPrivateKey The client's private key used for derivations
+   * @param {String} obj.initialRequestPath Initial request path for establishing a connection
+   * @param {Array} obj.certificates Provided certificates from the client
    * @constructor
    */
   constructor ({
@@ -154,8 +158,8 @@ class Authrite {
   }
 
   /**
-   * @public
    * Creates a new signed authrite request and returns the result
+   * @public
    * @param {String} requestUrl The URL to request on an Authrite-enabled server
    * @param {object} fetchConfig Config object passed to the [Fetch API](https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API). The current version of Authrite only supports JSON structures for the fetch body. However, you can include a [Buffer](https://nodejs.org/api/buffer.html) as part of the json object.
    * @returns {object} The response object. Fields are 'status', 'headers' and 'body' (containing an ArrayBuffer of the HTTP response body)
@@ -307,6 +311,7 @@ class Authrite {
   /**
    * Support initializing a socket connection to a server
    * Currently implemented as a drop-in replacement for the socket.io wrapper of WebSockets
+   * @public
    * @param {string} connectionUrl - the url of the server to connect to over web sockets
    * @param {object} config - standard socket.io configuration param
    */
@@ -378,6 +383,12 @@ class Authrite {
     return this
   }
 
+  /**
+   * Configures custom client events for incoming server websocket events
+   * @public
+   * @param {string} event
+   * @param {function} callback
+   */
   on (event, callback) {
     if (!this.socket) {
       const e = new Error('You must first configure a socket connection!')
@@ -408,6 +419,12 @@ class Authrite {
     this.socket.on(event, wrappedCallback)
   }
 
+  /**
+   * Emits a message to a connected server over web sockets
+   * @public
+   * @param {string} event
+   * @param {object | string | buffer} data
+   */
   async emit (event, data) {
     const requestNonce = crypto.randomBytes(32).toString('base64')
 
@@ -446,6 +463,9 @@ class Authrite {
     })
   }
 
+  /**
+   * Disconnects the current socket connection
+   */
   disconnect () {
     this.socket.disconnect()
   }
