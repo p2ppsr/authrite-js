@@ -1,13 +1,15 @@
 {
   "name": "authrite-js",
-  "version": "0.2.16",
+  "version": "0.3.1",
   "description": "A system for mutual authentication of two parties over a communications channel",
   "main": "src/index.js",
   "scripts": {
     "test": "jest",
     "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
     "doc": "documentation readme src/authrite.js -f md -s API -a public",
-    "lint": "standard --fix ."
+    "lint": "standard --fix .",
+    "build": "webpack --config webpack.prod.js"
   },
   "repository": {
     "type": "git",
@@ -21,16 +23,27 @@
   "homepage": "https://github.com/p2ppsr/authrite-js#readme",
   "dependencies": {
     "@babbage/sdk": "^0.4.9",
-    "authrite-utils": "^0.1.15",
+    "authrite-utils": "^0.2.0",
     "babbage-bsv": "^0.1.1",
     "boomerang-http": "^0.1.0",
     "node-fetch": "^2.6.0",
-    "sendover": "^1.1.5"
+    "node-polyfill-webpack-plugin": "^2.0.1",
+    "sendover": "^1.1.5",
+    "socket.io-client": "^4.7.2"
   },
   "devDependencies": {
+    "@babel/core": "^7.18.5",
+    "@babel/preset-env": "^7.18.2",
+    "babel-loader": "^8.2.5",
+    "cryptononce": "^0.1.1",
     "documentation": "^14.0.0",
     "fetch-mock": "^9.11.0",
     "jest": "^28.0.3",
-    "standard": "^17.0.0"
+    "standard": "^17.0.0",
+    "url-loader": "^4.1.1",
+    "webpack": "^5.75.0",
+    "webpack-cli": "^4.10.0",
+    "webpack-dev-server": "^4.9.2",
+    "webpack-merge": "^5.8.0"
   }
 }
