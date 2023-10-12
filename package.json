@@ -38,7 +38,7 @@
     "cryptononce": "^0.1.1",
     "documentation": "^14.0.0",
     "fetch-mock": "^9.11.0",
-    "jest": "^28.0.3",
+    "jest": "^29.7.0",
     "standard": "^17.0.0",
     "url-loader": "^4.1.1",
     "webpack": "^5.75.0",
