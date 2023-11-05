@@ -24,7 +24,7 @@
   "dependencies": {
     "@babbage/sdk": "^0.4.9",
     "authrite-utils": "^0.2.0",
-    "babbage-bsv": "^0.1.1",
+    "babbage-bsv": "^0.2.2",
     "boomerang-http": "^0.1.0",
     "node-fetch": "^2.6.0",
     "node-polyfill-webpack-plugin": "^2.0.1",
