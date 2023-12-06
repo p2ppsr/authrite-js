@@ -165,7 +165,6 @@ class Authrite {
    * @returns {object} The response object. Fields are 'status', 'headers' and 'body' (containing an ArrayBuffer of the HTTP response body)
    */
   async request (requestUrl, fetchConfig = {}) {
-    console.log("authrite requestUrl", requestUrl)
     // Extract baseUrl from URL
     const parsedUrl = new URL(requestUrl)
     if (!parsedUrl.host) {
