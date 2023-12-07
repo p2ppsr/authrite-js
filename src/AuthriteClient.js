@@ -1,3 +1,4 @@
+const bsv = require('babbage-bsv')
 const sdk = require('@babbage/sdk')
 const { Authrite } = require('./authrite')
 
@@ -21,6 +22,9 @@ class AuthriteClient {
     // Authrite caches certificates for multiple clients.
     // For performance, there should be only one.
     if (!AuthriteClient.Authrite) AuthriteClient.Authrite = {}
+    if (configId === 'default' && authriteParams?.clientPrivateKey) {
+      configId = bsv.PrivateKey.fromHex(authriteParams.clientPrivateKey).publicKey.toString()
+    }
     if (!AuthriteClient.Authrite[configId]) {
       AuthriteClient.Authrite[configId] = new Authrite(authriteParams)
     }
