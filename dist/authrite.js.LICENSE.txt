@@ -1,16 +1,3 @@
-/*
-object-assign
-(c) Sindre Sorhus
-@license MIT
-*/
-
-/*!
-     * The buffer module from node.js, for the browser.
-     *
-     * @author   Feross Aboukhadijeh <http://feross.org>
-     * @license  MIT
-     */
-
 /*!
  * Copyright (c) 2014, GMO GlobalSign
  * Copyright (c) 2015-2022, Peculiar Ventures
