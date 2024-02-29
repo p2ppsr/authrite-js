@@ -23,11 +23,11 @@
   "homepage": "https://github.com/p2ppsr/authrite-js#readme",
   "dependencies": {
     "@babbage/sdk": "^0.4.44",
-    "authrite-utils": "^0.2.33",
+    "authrite-utils": "^0.2.35",
     "babbage-bsv": "^0.2.4",
     "boomerang-http": "^0.1.0",
     "node-fetch": "^2.6.0",
-    "sendover": "^1.2.19",
+    "sendover": "^1.2.20",
     "socket.io-client": "^4.7.2"
   },
   "devDependencies": {
@@ -38,12 +38,12 @@
     "documentation": "^14.0.0",
     "fetch-mock": "^9.11.0",
     "jest": "^28.0.3",
+    "node-polyfill-webpack-plugin": "^2.0.1",
     "standard": "^17.0.0",
     "url-loader": "^4.1.1",
     "webpack": "^5.75.0",
     "webpack-cli": "^4.10.0",
     "webpack-dev-server": "^4.9.2",
-    "webpack-merge": "^5.8.0",
-    "node-polyfill-webpack-plugin": "^2.0.1"
+    "webpack-merge": "^5.8.0"
   }
 }
