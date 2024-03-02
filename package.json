@@ -1,6 +1,6 @@
 {
   "name": "authrite-js",
-  "version": "0.4.1",
+  "version": "0.4.2",
   "description": "A system for mutual authentication of two parties over a communications channel",
   "main": "src/index.js",
   "scripts": {
