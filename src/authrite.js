@@ -35,7 +35,7 @@ const AUTHRITE_VERSION = '0.2'
    * @private
    */
 class Client {
-  constructor () {
+  constructor() {
     this.nonce = crypto.randomBytes(32).toString('base64')
   }
 }
@@ -50,7 +50,7 @@ class Client {
    * @private
    */
 class Server {
-  constructor (baseUrl, identityPublicKey, nonce, certificates, requestedCertificates) {
+  constructor(baseUrl, identityPublicKey, nonce, certificates, requestedCertificates) {
     this.baseUrl = baseUrl
     this.identityPublicKey = identityPublicKey
     this.nonce = nonce
@@ -74,7 +74,7 @@ class Authrite {
    * @param {Array} obj.certificates Provided certificates from the client
    * @constructor
    */
-  constructor ({
+  constructor({
     clientPrivateKey,
     initialRequestPath = '/authrite/initialRequest',
     signingStrategy = 'Babbage',
@@ -121,7 +121,7 @@ class Authrite {
   }
 
   // Fetch initial server parameters
-  async getServerParameters (baseUrl) {
+  async getServerParameters(baseUrl) {
     this.clients[baseUrl] = new Client()
     this.servers[baseUrl] = new Server(baseUrl, null, null, [], [])
     // Retrieve the client's public identity key for the initial request
@@ -164,7 +164,7 @@ class Authrite {
    * @param {object} fetchConfig Config object passed to the [Fetch API](https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API). The current version of Authrite only supports JSON structures for the fetch body. However, you can include a [Buffer](https://nodejs.org/api/buffer.html) as part of the json object.
    * @returns {object} The response object. Fields are 'status', 'headers' and 'body' (containing an ArrayBuffer of the HTTP response body)
    */
-  async request (requestUrl, fetchConfig = {}) {
+  async request(requestUrl, fetchConfig = {}) {
     // Extract baseUrl from URL
     const parsedUrl = new URL(requestUrl)
     if (!parsedUrl.host) {
@@ -315,7 +315,7 @@ class Authrite {
    * @param {string} connectionUrl - the url of the server to connect to over web sockets
    * @param {object} config - standard socket.io configuration param
    */
-  async connect (connectionUrl, config = {}) {
+  async connect(connectionUrl, config = {}) {
     this.clients[connectionUrl] = new Client()
     this.servers[connectionUrl] = new Server(connectionUrl, null, null, [], [])
 
@@ -362,24 +362,32 @@ class Authrite {
     })
 
     // Validate the server's initial response
-    this.socket.on('validationResponse', async (serverResponse) => {
-      console.log('Server says:', serverResponse)
+    const validationPromise = new Promise((resolve, reject) => {
+      this.socket.on('validationResponse', async (serverResponse) => {
+        console.log('Server says:', serverResponse)
 
-      // Note: potential to hang while waiting...
-      await verifyServerInitialResponse({
-        authriteVersion: AUTHRITE_VERSION,
-        baseUrl: this.socketConnectionUrl,
-        signingStrategy: this.signingStrategy,
-        clientPrivateKey: this.clientPrivateKey,
-        clients: this.clients,
-        servers: this.servers,
-        serverResponse,
-        certificates: this.certificates
+        try {
+          // Note: potential to hang while waiting...
+          await verifyServerInitialResponse({
+            authriteVersion: AUTHRITE_VERSION,
+            baseUrl: this.socketConnectionUrl,
+            signingStrategy: this.signingStrategy,
+            clientPrivateKey: this.clientPrivateKey,
+            clients: this.clients,
+            servers: this.servers,
+            serverResponse,
+            certificates: this.certificates
+          })
+          console.log('Server initial response verified!')
+          resolve()
+        } catch (error) {
+          reject(error)
+        }
       })
-      console.log('Server initial response verified!')
     })
 
-    // Return the current Authrite instance for direct access
+    // Wait for the validation to complete before returning the current Authrite instance 
+    await validationPromise
     return this
   }
 
@@ -389,7 +397,7 @@ class Authrite {
    * @param {string} event
    * @param {function} callback
    */
-  on (event, callback) {
+  on(event, callback) {
     if (!this.socket) {
       const e = new Error('You must first configure a socket connection!')
       e.code = 'ERR_MISSING_SOCKET'
@@ -399,7 +407,7 @@ class Authrite {
     const wrappedCallback = async (body) => {
       // Check if this is a custom or system call
       if (body && body.data && body.headers) {
-      // Call the helper auth function
+        // Call the helper auth function
         await verifyServerResponse({
           messageToVerify: JSON.stringify(body.data),
           headers: body.headers,
@@ -420,12 +428,28 @@ class Authrite {
   }
 
   /**
+   * Removes specific socket event listeners
+   * @param {string} event
+   * @param {function} callback
+   */
+  off(event, callback) {
+    if (!this.socket) {
+      const e = new Error('You must first configure a socket connection!')
+      e.code = 'ERR_MISSING_SOCKET'
+      throw e
+    }
+
+    // Remove the specified event listener from the current socket connection
+    this.socket.off(event, callback)
+  }
+
+  /**
    * Emits a message to a connected server over web sockets
    * @public
    * @param {string} event
    * @param {object | string | buffer} data
    */
-  async emit (event, data) {
+  async emit(event, data) {
     const requestNonce = crypto.randomBytes(32).toString('base64')
 
     // Create a request signature over the data to emit
@@ -466,7 +490,7 @@ class Authrite {
   /**
    * Disconnects the current socket connection
    */
-  disconnect () {
+  disconnect() {
     this.socket.disconnect()
   }
 
@@ -475,7 +499,7 @@ class Authrite {
    * Adds a newly created certificate to the cache
    * @param {object} certificate Certificate produced by createCertificate to be added to the cache.
    */
-  async addCertificate (certificate) {
+  async addCertificate(certificate) {
     // Don't add if duplicate
     if (!this.certificates.every(c => c.signature !== certificate.signature)) {
       return
