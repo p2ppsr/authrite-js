@@ -444,15 +444,22 @@ class Authrite {
   }
 
   /**
-   * Removes all event listeners for the current socket connection
+   * Removes event listeners for the current socket connection
+   * @param {string} [event] specific socket event to remove all listeners from 
    */
-  removeAllListeners() {
+  removeAllListeners(event) {
     if (!this.socket) {
       const e = new Error('You must first configure a socket connection!')
       e.code = 'ERR_MISSING_SOCKET'
       throw e
     }
-    this.socket.removeAllListeners()
+    // If an event is provided, remove all listeners for that specific event
+    if (event) {
+      this.socket.removeAllListeners(event)
+    } else {
+      // If no event is provided, remove all listeners for all events
+      this.socket.removeAllListeners()
+    }
   }
 
   /**
