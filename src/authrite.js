@@ -444,6 +444,18 @@ class Authrite {
   }
 
   /**
+   * Removes all event listeners for the current socket connection
+   */
+  removeAllListeners() {
+    if (!this.socket) {
+      const e = new Error('You must first configure a socket connection!')
+      e.code = 'ERR_MISSING_SOCKET'
+      throw e
+    }
+    this.socket.removeAllListeners()
+  }
+
+  /**
    * Emits a message to a connected server over web sockets
    * @public
    * @param {string} event
