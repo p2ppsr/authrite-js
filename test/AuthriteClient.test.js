@@ -1,8 +1,8 @@
 /* eslint-env jest */
 const { AuthriteClient } = require('../src/AuthriteClient')
-const sdk = require('@babbage/sdk')
+const sdk = require('@babbage/sdk-ts')
 
-jest.mock('@babbage/sdk')
+jest.mock('@babbage/sdk-ts')
 
 describe('AuthriteClient', () => {
   beforeEach(() => {

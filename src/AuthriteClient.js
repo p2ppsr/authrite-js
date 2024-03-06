@@ -1,5 +1,5 @@
 const bsv = require('babbage-bsv')
-const sdk = require('@babbage/sdk')
+const sdk = require('@babbage/sdk-ts')
 const { Authrite } = require('./authrite')
 
 class AuthriteClient {

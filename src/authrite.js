@@ -1,7 +1,7 @@
 const boomerang = require('boomerang-http')
 const bsv = require('babbage-bsv')
 const crypto = require('crypto')
-const BabbageSDK = require('@babbage/sdk')
+const BabbageSDK = require('@babbage/sdk-ts')
 const { verifyCertificateSignature } = require('authrite-utils')
 const io = require('socket.io-client')
 
