@@ -22,8 +22,8 @@
   },
   "homepage": "https://github.com/p2ppsr/authrite-js#readme",
   "dependencies": {
-    "@babbage/sdk-ts": "^0.2.17",
-    "authrite-utils": "^0.3.19",
+    "@babbage/sdk-ts": "^0.2.18",
+    "authrite-utils": "^0.3.20",
     "babbage-bsv": "^0.2.4",
     "boomerang-http": "^0.1.0",
     "node-fetch": "^2.6.0",
